@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: smartspot-backend
+    env: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DB_FILE
+        value: ./data/smartspot.json
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: MAIL_FROM_NAME
+        value: SmartSpot
+    disk:
+      name: smartspot-data
+      mountPath: /app/backend/data
+      sizeGB: 1

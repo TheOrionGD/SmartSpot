@@ -1,0 +1,182 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show Color;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../models/reminder.dart';
+
+/// Wraps `flutter_local_notifications` behind a small, app-specific API.
+///
+/// Actual permission requesting is handled by [PermissionHelper] elsewhere
+/// (via permission_handler) — this service assumes permission has already
+/// been granted by the time [showGeofenceNotification] is called, and simply
+/// won't display anything if it hasn't been.
+class NotificationService {
+  NotificationService._();
+  static final NotificationService instance = NotificationService._();
+
+  final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
+  bool _initialized = false;
+
+  static const String _geofenceChannelId = 'smartspot_geofence_channel';
+  static const String _geofenceChannelName = 'Location Reminders';
+  static const String _geofenceChannelDescription =
+      'Alerts you when you enter or leave a reminder location';
+
+  Future<void> init() async {
+    if (_initialized) return;
+
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosInit = DarwinInitializationSettings(
+      // Permission is requested explicitly via permission_handler in
+      // PermissionHelper, so we don't ask again here to avoid a double prompt.
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+
+    const initSettings = InitializationSettings(
+      android: androidInit,
+      iOS: iosInit,
+    );
+
+    await _plugin.initialize(initSettings);
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      const channel = AndroidNotificationChannel(
+        _geofenceChannelId,
+        _geofenceChannelName,
+        description: _geofenceChannelDescription,
+        importance: Importance.high,
+        playSound: true,
+        enableVibration: true,
+      );
+      await _plugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(channel);
+    }
+
+    _initialized = true;
+  }
+
+  /// Shows a notification for a reminder's geofence enter/exit event.
+  Future<void> showGeofenceNotification({
+    required Reminder reminder,
+    required bool isEnter,
+    bool withSound = true,
+    bool withVibration = true,
+  }) async {
+    if (!_initialized) await init();
+
+    final title = isEnter ? "📍 You've arrived" : '👋 Leaving the area';
+    final place = reminder.locationName ?? 'your reminder location';
+    final body = isEnter
+        ? '${reminder.title} — you\'re near $place'
+        : '${reminder.title} — you\'re leaving $place';
+
+    final androidDetails = AndroidNotificationDetails(
+      _geofenceChannelId,
+      _geofenceChannelName,
+      channelDescription: _geofenceChannelDescription,
+      importance: Importance.high,
+      priority: Priority.high,
+      playSound: withSound,
+      enableVibration: withVibration,
+      styleInformation: BigTextStyleInformation(body),
+      color: const Color(0xFFFF8A73),
+    );
+
+    final iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: withSound,
+    );
+
+    // Use enter/exit + reminder id to produce a stable, unique notification
+    // id so an enter and an exit for the same reminder don't overwrite
+    // each other, but repeat triggers of the *same* event do (no spam).
+    final notificationId = (reminder.id.hashCode & 0x7fffffff) ^ (isEnter ? 1 : 0);
+
+    await _plugin.show(
+      notificationId,
+      title,
+      body,
+      NotificationDetails(android: androidDetails, iOS: iosDetails),
+      payload: reminder.id,
+    );
+  }
+
+  /// Shows a single grouped notification summarizing multiple geofence
+  /// events that fired close together (e.g. several reminders near the
+  /// same place, or several unrelated reminders that happened to trigger
+  /// on the same location update) instead of showing one notification per
+  /// reminder. Falls back gracefully — callers should only invoke this with
+  /// 2+ events; with exactly 1 event, prefer [showGeofenceNotification].
+  Future<void> showBundledGeofenceNotification({
+    required List<({Reminder reminder, bool isEnter})> events,
+    bool withSound = true,
+    bool withVibration = true,
+  }) async {
+    if (!_initialized) await init();
+    if (events.isEmpty) return;
+    if (events.length == 1) {
+      final only = events.first;
+      return showGeofenceNotification(
+        reminder: only.reminder,
+        isEnter: only.isEnter,
+        withSound: withSound,
+        withVibration: withVibration,
+      );
+    }
+
+    final enterCount = events.where((e) => e.isEnter).length;
+    final exitCount = events.length - enterCount;
+    final title = '📍 ${events.length} reminders nearby';
+    final summaryParts = <String>[];
+    if (enterCount > 0) summaryParts.add('$enterCount arrival${enterCount == 1 ? '' : 's'}');
+    if (exitCount > 0) summaryParts.add('$exitCount departure${exitCount == 1 ? '' : 's'}');
+    final summary = summaryParts.join(' · ');
+
+    final lines = events
+        .map((e) => '${e.isEnter ? '📍' : '👋'} ${e.reminder.title}')
+        .toList();
+
+    final androidDetails = AndroidNotificationDetails(
+      _geofenceChannelId,
+      _geofenceChannelName,
+      channelDescription: _geofenceChannelDescription,
+      importance: Importance.high,
+      priority: Priority.high,
+      playSound: withSound,
+      enableVibration: withVibration,
+      styleInformation: InboxStyleInformation(
+        lines,
+        contentTitle: title,
+        summaryText: summary,
+      ),
+      color: const Color(0xFFFF8A73),
+      groupKey: 'smartspot_geofence_group',
+    );
+
+    final iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: withSound,
+      subtitle: summary,
+      threadIdentifier: 'smartspot_geofence_group',
+    );
+
+    // A fixed id (distinct from any single-reminder id, which is derived
+    // from reminder.id.hashCode) so repeated bundles replace each other
+    // instead of stacking, and never collide with a single-event id.
+    const bundledNotificationId = 0x7ffffffe;
+
+    await _plugin.show(
+      bundledNotificationId,
+      title,
+      summary,
+      NotificationDetails(android: androidDetails, iOS: iosDetails),
+    );
+  }
+
+  Future<void> cancelAll() => _plugin.cancelAll();
+}
