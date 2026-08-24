@@ -1,0 +1,39 @@
+# Exported from Render on 2026-08-24T06:07:41Z
+version: "1"
+projects:
+- name: College-Projects
+  environments:
+  - name: Production
+    services:
+    - type: web
+      name: smartspot-backend
+      runtime: node
+      repo: https://github.com/TheOrionGD/SmartSpot
+      plan: free
+      envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DB_FILE
+        value: ./data/smartspot.json
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: MAIL_FROM_NAME
+        value: SmartSpot
+      - key: CORS_ORIGIN
+        sync: false
+      region: oregon
+      buildCommand: npm install
+      startCommand: npm start
+      healthCheckPath: /health
+      disk:
+        name: smartspot-data
+        mountPath: /app/backend/data
+        sizeGB: 1
+      autoDeployTrigger: commit
+      rootDir: backend
