@@ -62,9 +62,9 @@ app.set('trust proxy', isProduction ? 1 : 0);
 app.use(helmet());
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN
-      ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
-      : true,
+    origin: !process.env.CORS_ORIGIN || process.env.CORS_ORIGIN.trim() === '*'
+      ? '*'
+      : process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim()),
   })
 );
 
