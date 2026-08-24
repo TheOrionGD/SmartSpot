@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const path = require('node:path');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -59,7 +60,7 @@ async function sendPasswordChangedEmail(email, name) {
 }
 
 app.set('trust proxy', isProduction ? 1 : 0);
-app.use(helmet());
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(
   cors({
     origin: !process.env.CORS_ORIGIN || process.env.CORS_ORIGIN.trim() === '*'
@@ -67,6 +68,8 @@ app.use(
       : process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim()),
   })
 );
+
+app.use(express.static(path.join(__dirname, '../public')));
 
 // Rate limiter for API routes
 app.use(
@@ -97,13 +100,14 @@ function auth(req, res, next) {
 }
 
 // ---------------------------------------------------------------------------
-// Root Landing & Health check
+// Root Landing, Reset Password Web UI & Health check
 // ---------------------------------------------------------------------------
 app.get('/', (_req, res) =>
   res.json({
     status: 'online',
     message: 'Welcome to SmartSpot Location Reminders REST API',
     health: '/health',
+    resetPasswordUI: '/reset-password',
     documentation: 'https://github.com/TheOrionGD/SmartSpot',
     timestamp: now(),
   })
@@ -112,6 +116,10 @@ app.get('/', (_req, res) =>
 app.get('/health', (_req, res) =>
   res.json({ ok: true, service: 'smartspot-backend', timestamp: now() })
 );
+
+app.get(['/reset-password', '/forgot-password'], (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/reset-password.html'));
+});
 
 // ---------------------------------------------------------------------------
 // Authentication & User Management Routes
