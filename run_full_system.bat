@@ -59,7 +59,7 @@ if errorlevel 1 (
 )
 popd
 
-echo Launching backend on http://localhost:3000...
+echo Launching local backend on http://localhost:3000 (Cloud backend: https://smartspot-backend-55n9.onrender.com)...
 start "SmartSpot Backend" /D "%BACKEND%" cmd /k "npm run dev"
 
 timeout /t 2 /nobreak >nul
