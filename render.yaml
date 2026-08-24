@@ -22,11 +22,11 @@ projects:
       - key: BREVO_API_KEY
         sync: false
       - key: MAIL_FROM
-        sync: false
+        value: godfrey.cs23@krct.ac.in
       - key: MAIL_FROM_NAME
         value: SmartSpot
       - key: CORS_ORIGIN
-        sync: false
+        value: "*"
       region: oregon
       buildCommand: npm install
       startCommand: npm start
