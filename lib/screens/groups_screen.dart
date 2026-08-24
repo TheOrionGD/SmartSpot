@@ -236,7 +236,17 @@ class _GroupCard extends StatelessWidget {
                 runSpacing: 8,
                 children: group.memberNames
                     .map((m) => Chip(
-                          label: Text(m, style: const TextStyle(fontSize: 12)),
+                          label: Text(
+                            m,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? Colors.grey[100] : const Color(0xFF10131C),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          backgroundColor: isDark ? AppColors.surfaceDark : Colors.grey[200],
+                          side: BorderSide(color: isDark ? Colors.white24 : Colors.black12),
+                          deleteIconColor: isDark ? Colors.grey[400] : Colors.grey[700],
                           onDeleted: () =>
                               context.read<FamilyGroupProvider>().removeMember(group.id, m),
                         ))

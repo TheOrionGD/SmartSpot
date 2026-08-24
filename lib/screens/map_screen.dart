@@ -59,7 +59,6 @@ class _MapScreenState extends State<MapScreen> {
   static const ll.LatLng _fallback = ll.LatLng(11.3410, 77.7172); // Erode, TN fallback
 
   final MapController _mapController = MapController();
-  final Geocoding _geocoding = Geocoding();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
 
@@ -94,7 +93,7 @@ class _MapScreenState extends State<MapScreen> {
   Future<void> _resolveAddress(ll.LatLng position) async {
     setState(() => _isResolvingAddress = true);
     try {
-      final placemarks = await _geocoding.placemarkFromCoordinates(
+      final placemarks = await Geocoding().placemarkFromCoordinates(
         position.latitude,
         position.longitude,
       );
@@ -104,17 +103,47 @@ class _MapScreenState extends State<MapScreen> {
             .where((e) => e != null && e.isNotEmpty)
             .toSet()
             .toList();
-        setState(() {
-          _address = parts.isNotEmpty
-              ? parts.join(', ')
-              : '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
-        });
+        if (mounted) {
+          setState(() {
+            _address = parts.isNotEmpty
+                ? parts.join(', ')
+                : '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
+          });
+        }
+        return;
       }
     } catch (_) {
-      setState(() {
-        _address =
-        '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
-      });
+      // Fallback for Web/Desktop where native geocoding is unsupported
+      try {
+        final uri = Uri.https('nominatim.openstreetmap.org', '/reverse', {
+          'lat': position.latitude.toString(),
+          'lon': position.longitude.toString(),
+          'format': 'json',
+        });
+        final response = await http.get(
+          uri,
+          headers: {'User-Agent': 'com.smartspot.app (SmartSpot Flutter app)'},
+        );
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          final displayName = data['display_name'] as String?;
+          if (displayName != null && displayName.isNotEmpty) {
+            if (mounted) {
+              setState(() {
+                _address = displayName;
+              });
+            }
+            return;
+          }
+        }
+      } catch (_) {}
+
+      if (mounted) {
+        setState(() {
+          _address =
+              '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
+        });
+      }
     } finally {
       if (mounted) setState(() => _isResolvingAddress = false);
     }

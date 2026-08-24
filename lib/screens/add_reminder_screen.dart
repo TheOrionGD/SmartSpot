@@ -731,9 +731,11 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                           label: Text(_repeatTypeLabel(type)),
                           selected: selected,
                           showCheckmark: false,
-                          selectedColor: AppColors.primary.withValues(alpha: 0.18),
+                          selectedColor: AppColors.primary.withValues(alpha: 0.2),
                           labelStyle: TextStyle(
-                            color: selected ? AppColors.primary : Colors.grey[700],
+                            color: selected
+                                ? (isDark ? AppColors.primaryLight : AppColors.primaryDark)
+                                : (isDark ? Colors.grey[200] : const Color(0xFF2D3142)),
                             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                             fontSize: 13,
                           ),
@@ -764,7 +766,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                             : 'Pick one or more days',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[500],
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -779,9 +781,11 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                             label: Text(_dayShortName(day)),
                             selected: selected,
                             showCheckmark: false,
-                            selectedColor: AppColors.primary.withValues(alpha: 0.18),
+                            selectedColor: AppColors.primary.withValues(alpha: 0.2),
                             labelStyle: TextStyle(
-                              color: selected ? AppColors.primary : Colors.grey[700],
+                              color: selected
+                                  ? (isDark ? AppColors.primaryLight : AppColors.primaryDark)
+                                  : (isDark ? Colors.grey[200] : const Color(0xFF2D3142)),
                               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                               fontSize: 13,
                             ),

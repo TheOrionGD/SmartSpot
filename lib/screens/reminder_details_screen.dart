@@ -23,6 +23,7 @@ class ReminderDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final color = _priorityColor(reminder.priority);
 
     return Scaffold(
@@ -83,7 +84,14 @@ class ReminderDetailsScreen extends StatelessWidget {
                   labelStyle: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold),
                 ),
               if (reminder.isArchived)
-                const Chip(label: Text('ARCHIVED')),
+                Chip(
+                  label: const Text('ARCHIVED'),
+                  backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
+                  labelStyle: TextStyle(
+                    color: isDark ? Colors.grey[200] : const Color(0xFF2D3142),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
             ],
           ),
           if (reminder.description != null && reminder.description!.isNotEmpty) ...[

@@ -23,36 +23,42 @@ class NotificationService {
 
   Future<void> init() async {
     if (_initialized) return;
+    if (kIsWeb) {
+      _initialized = true;
+      return;
+    }
 
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosInit = DarwinInitializationSettings(
-      // Permission is requested explicitly via permission_handler in
-      // PermissionHelper, so we don't ask again here to avoid a double prompt.
-      requestAlertPermission: false,
-      requestBadgePermission: false,
-      requestSoundPermission: false,
-    );
-
-    const initSettings = InitializationSettings(
-      android: androidInit,
-      iOS: iosInit,
-    );
-
-    await _plugin.initialize(initSettings);
-
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      const channel = AndroidNotificationChannel(
-        _geofenceChannelId,
-        _geofenceChannelName,
-        description: _geofenceChannelDescription,
-        importance: Importance.high,
-        playSound: true,
-        enableVibration: true,
+    try {
+      const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const iosInit = DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
       );
-      await _plugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(channel);
+
+      const initSettings = InitializationSettings(
+        android: androidInit,
+        iOS: iosInit,
+      );
+
+      await _plugin.initialize(initSettings);
+
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        const channel = AndroidNotificationChannel(
+          _geofenceChannelId,
+          _geofenceChannelName,
+          description: _geofenceChannelDescription,
+          importance: Importance.high,
+          playSound: true,
+          enableVibration: true,
+        );
+        await _plugin
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>()
+            ?.createNotificationChannel(channel);
+      }
+    } catch (e) {
+      debugPrint('NotificationService init skipped/failed: $e');
     }
 
     _initialized = true;

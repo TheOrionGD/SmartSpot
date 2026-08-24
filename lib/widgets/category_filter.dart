@@ -144,7 +144,9 @@ class CategoryFilter extends StatelessWidget {
                   label,
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: isSelected ? Colors.white : null,
+                    color: isSelected
+                        ? Colors.white
+                        : (isDark ? Colors.grey[200] : const Color(0xFF10131C)),
                     letterSpacing: 0.3,
                   ),
                 ),

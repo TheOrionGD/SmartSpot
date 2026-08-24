@@ -25,6 +25,8 @@ dependencies:
   flutter_local_notifications: ^18.0.1
   shared_preferences: ^2.3.3
   google_fonts: ^6.2.1
+  sqflite_common_ffi: ^2.4.2+1
+  sqflite_common_ffi_web: ^1.1.2
 
 dev_dependencies:
   flutter_test:

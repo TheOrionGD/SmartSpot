@@ -1,4 +1,6 @@
-import 'package:sqflite/sqflite.dart';
+import 'package:flutter/foundation.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'package:path/path.dart';
 import 'package:uuid/uuid.dart';
 import '../models/reminder.dart';
@@ -7,6 +9,7 @@ import '../models/location_visit.dart';
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
   static Database? _database;
+  static bool _factoryInitialized = false;
 
   factory DatabaseService() {
     return _instance;
@@ -21,8 +24,25 @@ class DatabaseService {
   }
 
   Future<Database> _initDatabase() async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, 'smartspot.db');
+    if (!_factoryInitialized) {
+      if (kIsWeb) {
+        databaseFactory = databaseFactoryFfiWeb;
+      } else if (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux ||
+          defaultTargetPlatform == TargetPlatform.macOS) {
+        sqfliteFfiInit();
+        databaseFactory = databaseFactoryFfi;
+      }
+      _factoryInitialized = true;
+    }
+
+    final String path;
+    if (kIsWeb) {
+      path = inMemoryDatabasePath;
+    } else {
+      final dbPath = await getDatabasesPath();
+      path = join(dbPath, 'smartspot.db');
+    }
 
     return await openDatabase(
       path,
@@ -193,7 +213,8 @@ class DatabaseService {
     return List.generate(maps.length, (i) => Reminder.fromMap(maps[i]));
   }
 
-  Future<List<Reminder>> getRemindersByCategory(ReminderCategory category) async {
+  Future<List<Reminder>> getRemindersByCategory(
+      ReminderCategory category) async {
     final db = await database;
     final maps = await db.query(
       'reminders',
@@ -262,7 +283,8 @@ class DatabaseService {
           // they were already completed "today" vs. a previous occurrence.
           // Left unchanged when un-completing — resetDueRecurringReminders
           // only reads this field for rows where isCompleted = 1.
-          lastCompletedAt: nowCompleted ? DateTime.now() : reminder.lastCompletedAt,
+          lastCompletedAt:
+              nowCompleted ? DateTime.now() : reminder.lastCompletedAt,
         ),
       );
     }
@@ -290,9 +312,8 @@ class DatabaseService {
     final totalResult = await db.rawQuery(
       'SELECT COUNT(*) as count FROM reminders WHERE isArchived = 0',
     );
-    final total = totalResult.isNotEmpty
-        ? (totalResult.first['count'] as int?) ?? 0
-        : 0;
+    final total =
+        totalResult.isNotEmpty ? (totalResult.first['count'] as int?) ?? 0 : 0;
 
     final completedResult = await db.rawQuery(
       'SELECT COUNT(*) as count FROM reminders WHERE isCompleted = 1 AND isArchived = 0',
@@ -330,7 +351,8 @@ class DatabaseService {
   Future<void> incrementMissedCount(String id) async {
     final reminder = await getReminderById(id);
     if (reminder == null) return;
-    await updateReminder(reminder.copyWith(missedCount: reminder.missedCount + 1));
+    await updateReminder(
+        reminder.copyWith(missedCount: reminder.missedCount + 1));
     final db = await database;
     await db.insert('missed_events', {
       'reminderId': id,
@@ -355,7 +377,8 @@ class DatabaseService {
   /// recurring patterns ("you're usually here Saturdays around 5 PM").
   Future<List<LocationVisit>> getRecentVisits({int days = 90}) async {
     final db = await database;
-    final cutoff = DateTime.now().subtract(Duration(days: days)).toIso8601String();
+    final cutoff =
+        DateTime.now().subtract(Duration(days: days)).toIso8601String();
     final maps = await db.query(
       'location_visits',
       where: 'timestamp >= ?',

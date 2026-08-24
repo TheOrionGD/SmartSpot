@@ -7,6 +7,15 @@ set "BACKEND=%ROOT%backend"
 echo Starting SmartSpot...
 echo.
 
+rem Auto-detect Flutter at G:\Flutter\flutter\bin if not present in PATH
+where flutter >nul 2>&1
+if errorlevel 1 (
+    if exist "G:\Flutter\flutter\bin" (
+        echo Adding G:\Flutter\flutter\bin to session PATH...
+        set "PATH=G:\Flutter\flutter\bin;%PATH%"
+    )
+)
+
 where node >nul 2>&1
 if errorlevel 1 (
     echo ERROR: Node.js was not found on PATH.
@@ -25,7 +34,7 @@ if errorlevel 1 (
 where flutter >nul 2>&1
 if errorlevel 1 (
     echo ERROR: Flutter was not found on PATH.
-    echo Install Flutter and enable the Windows desktop target, then run this script again.
+    echo Please add G:\Flutter\flutter\bin to your system PATH.
     pause
     exit /b 1
 )
@@ -64,11 +73,23 @@ start "SmartSpot Backend" /D "%BACKEND%" cmd /k "npm run dev"
 
 timeout /t 2 /nobreak >nul
 
-echo Launching Flutter Windows app...
-start "SmartSpot Flutter" /D "%ROOT%" cmd /k "flutter run -d windows"
+echo.
+echo Select Flutter Target Device:
+echo [1] Chrome Web (Recommended - works without Visual Studio C++)
+echo [2] Edge Web
+echo [3] Windows Desktop (Requires Visual Studio with C++ workload)
+echo.
+set "TARGET_DEVICE=chrome"
+set /p DEVICE_CHOICE="Enter choice [1-3] (default 1): "
+
+if "%DEVICE_CHOICE%"=="2" set "TARGET_DEVICE=edge"
+if "%DEVICE_CHOICE%"=="3" set "TARGET_DEVICE=windows"
+
+echo Launching Flutter app on %TARGET_DEVICE%...
+start "SmartSpot Flutter" /D "%ROOT%" cmd /k "set PATH=G:\Flutter\flutter\bin;%%PATH%% && flutter run -d %TARGET_DEVICE%"
 
 echo.
 echo SmartSpot is starting in two new windows.
 echo Close those windows to stop the backend and Flutter app.
 pause
-endlocal
+endlocal

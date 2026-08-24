@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/reminder_provider.dart';
+import '../services/auth_service.dart';
 import '../utils/app_theme.dart';
 import 'settings_screen.dart';
 import 'login_screen.dart';
@@ -119,7 +120,9 @@ class ProfileScreen extends StatelessWidget {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
-              onPressed: () {
+              onPressed: () async {
+                await AuthService.instance.signOut();
+                if (!context.mounted) return;
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (_) => const LoginScreen()),

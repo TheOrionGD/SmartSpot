@@ -1,7 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/auth_service.dart';
+import 'login_screen.dart';
+import 'main_navigation_shell.dart';
 import 'onboarding_screen.dart';
 import '../utils/app_theme.dart';
 
@@ -14,7 +18,6 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  Timer? _timer;
 
   @override
   void initState() {
@@ -24,25 +27,58 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       vsync: this,
     )..forward();
 
-    _timer = Timer(
-      const Duration(seconds: 3),
-      () {
-        if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const OnboardingScreen(),
-          ),
-        );
-      },
-    );
+    _checkAuthStateAndNavigate();
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkAuthStateAndNavigate() async {
+    final startTime = DateTime.now();
+
+    bool hasToken = false;
+    try {
+      final token = await AuthService.instance.getToken();
+      if (token != null && token.isNotEmpty) {
+        hasToken = true;
+      }
+    } catch (_) {
+      hasToken = false;
+    }
+
+    final elapsed = DateTime.now().difference(startTime);
+    final minDisplay = const Duration(seconds: 2);
+    if (elapsed < minDisplay) {
+      await Future.delayed(minDisplay - elapsed);
+    }
+
+    if (!mounted) return;
+
+    if (hasToken) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const MainNavigationShell()),
+      );
+    } else {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      final onboardingDone = prefs.getBool('onboarding_completed') ?? false;
+
+      if (onboardingDone) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        );
+      }
+    }
   }
 
   @override

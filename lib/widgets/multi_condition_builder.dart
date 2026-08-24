@@ -20,6 +20,8 @@ class MultiConditionBuilder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -30,10 +32,21 @@ class MultiConditionBuilder extends StatelessWidget {
             children: [
               for (var i = 0; i < conditions.length; i++)
                 Chip(
-                  label: Text(conditions[i].label, style: const TextStyle(fontSize: 12)),
+                  label: Text(
+                    conditions[i].label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? AppColors.primaryLight : AppColors.primaryDark,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   backgroundColor: AppColors.primary.withValues(alpha: 0.12),
                   side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
-                  deleteIcon: const Icon(Icons.close_rounded, size: 16),
+                  deleteIcon: Icon(
+                    Icons.close_rounded,
+                    size: 16,
+                    color: isDark ? AppColors.primaryLight : AppColors.primaryDark,
+                  ),
                   onDeleted: () => _removeAt(i),
                 ),
             ],
@@ -57,13 +70,27 @@ class MultiConditionBuilder extends StatelessWidget {
   }
 
   Widget _addButton(BuildContext context, String label, IconData icon, VoidCallback onTap) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return OutlinedButton.icon(
       onPressed: onTap,
-      icon: Icon(icon, size: 14),
-      label: Text(label, style: const TextStyle(fontSize: 12)),
+      icon: Icon(icon, size: 14, color: isDark ? AppColors.primaryLight : AppColors.primaryDark),
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          color: isDark ? Colors.grey[200] : const Color(0xFF2D3142),
+          fontWeight: FontWeight.w600,
+        ),
+      ),
       style: OutlinedButton.styleFrom(
-        foregroundColor: Colors.grey[700],
-        side: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
+        foregroundColor: isDark ? AppColors.primaryLight : AppColors.primaryDark,
+        backgroundColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.03),
+        side: BorderSide(
+          color: isDark
+              ? AppColors.primaryLight.withValues(alpha: 0.3)
+              : AppColors.primary.withValues(alpha: 0.3),
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
