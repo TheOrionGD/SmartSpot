@@ -29,7 +29,12 @@ const publicUser = (user) => ({
   id: user.id,
   name: user.name,
   email: user.email,
+  phone: user.phone || '',
+  bio: user.bio || '',
+  avatarUrl: user.avatarUrl || '',
+  securityQuestion: user.securityQuestion || '',
   createdAt: user.createdAt,
+  updatedAt: user.updatedAt || user.createdAt,
 });
 const signToken = (user) => jwt.sign({ sub: user.id }, jwtSecret, { expiresIn: '30d' });
 
@@ -83,6 +88,14 @@ app.use(
 );
 
 app.use(express.json({ limit: '2mb' }));
+
+// Handle invalid JSON body syntax errors gracefully
+app.use((err, _req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ error: 'Invalid JSON payload format' });
+  }
+  next(err);
+});
 
 // Auth Middleware
 function auth(req, res, next) {
@@ -149,10 +162,14 @@ app.post('/api/auth/register', (req, res) => {
     id: id(),
     name: name.trim(),
     email: normalizedEmail,
+    phone: typeof req.body.phone === 'string' ? req.body.phone.trim() : '',
+    bio: typeof req.body.bio === 'string' ? req.body.bio.trim() : '',
+    avatarUrl: typeof req.body.avatarUrl === 'string' ? req.body.avatarUrl.trim() : '',
     passwordHash: bcrypt.hashSync(password, 12),
     securityQuestion: securityQuestion.trim(),
     securityAnswerHash: bcrypt.hashSync(securityAnswer.trim().toLowerCase(), 12),
     createdAt: now(),
+    updatedAt: now(),
   };
 
   db.insert('users', user);
@@ -217,8 +234,8 @@ app.put('/api/auth/profile', auth, (req, res) => {
   const user = db.find('users', (candidate) => candidate.id === req.user.sub);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
-  const { name, email } = req.body || {};
-  const updates = {};
+  const { name, email, phone, bio, avatarUrl, securityQuestion, securityAnswer } = req.body || {};
+  const updates = { updatedAt: now() };
 
   if (name && typeof name === 'string' && name.trim()) {
     updates.name = name.trim();
@@ -231,6 +248,26 @@ app.put('/api/auth/profile', auth, (req, res) => {
       return res.status(409).json({ error: 'Email is already taken by another account' });
     }
     updates.email = normalizedEmail;
+  }
+
+  if (phone !== undefined && typeof phone === 'string') {
+    updates.phone = phone.trim();
+  }
+
+  if (bio !== undefined && typeof bio === 'string') {
+    updates.bio = bio.trim();
+  }
+
+  if (avatarUrl !== undefined && typeof avatarUrl === 'string') {
+    updates.avatarUrl = avatarUrl.trim();
+  }
+
+  if (securityQuestion && typeof securityQuestion === 'string' && securityQuestion.trim()) {
+    updates.securityQuestion = securityQuestion.trim();
+  }
+
+  if (securityAnswer && typeof securityAnswer === 'string' && securityAnswer.trim().length >= 2) {
+    updates.securityAnswerHash = bcrypt.hashSync(securityAnswer.trim().toLowerCase(), 12);
   }
 
   const updatedUser = db.update('users', (candidate) => candidate.id === user.id, updates);
@@ -703,7 +740,10 @@ app.get('/api/analytics/statistics', auth, (req, res) => {
 
 // Global error handler
 app.use((error, _req, res, _next) => {
-  console.error(error);
+  if (error?.status === 400 || error?.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: error.message || 'Invalid JSON request payload' });
+  }
+  console.error('Unhandled server error:', error);
   res.status(500).json({ error: 'Internal server error' });
 });
 

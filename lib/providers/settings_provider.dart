@@ -18,6 +18,7 @@ class SettingsProvider extends ChangeNotifier {
   static const _kAllowHighPriorityDuringQuietHours =
       'settings_allow_high_priority_during_quiet_hours';
   static const _kBundleNotifications = 'settings_bundle_notifications';
+  static const _kReducedMotion = 'settings_reduced_motion';
 
   bool _notificationsEnabled = true;
   bool _soundEnabled = true;
@@ -27,6 +28,7 @@ class SettingsProvider extends ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
   String _language = 'English';
   bool _isLoaded = false;
+  bool _reducedMotion = false;
 
   bool _quietHoursEnabled = false;
   TimeOfDay _quietHoursStart = const TimeOfDay(hour: 22, minute: 0);
@@ -41,6 +43,7 @@ class SettingsProvider extends ChangeNotifier {
   double get defaultRadius => _defaultRadius;
   ThemeMode get themeMode => _themeMode;
   String get language => _language;
+  bool get reducedMotion => _reducedMotion;
 
   bool get quietHoursEnabled => _quietHoursEnabled;
   TimeOfDay get quietHoursStart => _quietHoursStart;
@@ -75,6 +78,7 @@ class SettingsProvider extends ChangeNotifier {
     _allowHighPriorityDuringQuietHours =
         prefs.getBool(_kAllowHighPriorityDuringQuietHours) ?? true;
     _bundleNotifications = prefs.getBool(_kBundleNotifications) ?? true;
+    _reducedMotion = prefs.getBool(_kReducedMotion) ?? false;
 
     _isLoaded = true;
     notifyListeners();
@@ -224,5 +228,11 @@ class SettingsProvider extends ChangeNotifier {
       // Overnight window, e.g. 22:00 -> 07:00.
       return nowMinutes >= startMinutes || nowMinutes < endMinutes;
     }
+  }
+
+  Future<void> setReducedMotion(bool value) async {
+    _reducedMotion = value;
+    notifyListeners();
+    (await SharedPreferences.getInstance()).setBool(_kReducedMotion, value);
   }
 }

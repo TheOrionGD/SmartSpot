@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/reminder_provider.dart';
@@ -7,8 +8,23 @@ import 'services/notification_service.dart';
 import 'screens/splash_screen.dart';
 import 'utils/app_theme.dart';
 
+import 'providers/auth_provider.dart';
+import 'providers/live_location_provider.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Production Global Error Handlers
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint('SmartSpot FlutterError: ${details.exception}');
+  };
+
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    debugPrint('SmartSpot PlatformError: $error\n$stack');
+    return true;
+  };
+
   await NotificationService.instance.init();
   runApp(const MyApp());
 }
@@ -20,6 +36,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider<AuthProvider>(
+          create: (_) => AuthProvider(),
+        ),
         ChangeNotifierProvider<ReminderProvider>(
           create: (_) => ReminderProvider(),
         ),
@@ -28,6 +47,9 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<SettingsProvider>(
           create: (_) => SettingsProvider(),
+        ),
+        ChangeNotifierProvider<LiveLocationProvider>(
+          create: (_) => LiveLocationProvider(),
         ),
       ],
       child: const _AppRoot(),
@@ -203,11 +225,11 @@ class MyApp extends StatelessWidget {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primaryLight,
-          foregroundColor: const Color(0xFF10131C),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           textStyle: AppTypography.body(fontSize: 14, weight: FontWeight.w700),
         ),
       ),
@@ -216,7 +238,7 @@ class MyApp extends StatelessWidget {
           foregroundColor: AppColors.primaryLight,
           side: BorderSide(color: AppColors.primaryLight.withValues(alpha: 0.5), width: 1.4),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           textStyle: AppTypography.body(fontSize: 13, weight: FontWeight.w700),
         ),
       ),
@@ -233,14 +255,14 @@ class MyApp extends StatelessWidget {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.05),
+        fillColor: Colors.white.withValues(alpha: 0.06),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
@@ -251,15 +273,15 @@ class MyApp extends StatelessWidget {
       ),
       iconTheme: const IconThemeData(color: Colors.white, size: 24),
       chipTheme: ChipThemeData(
-        backgroundColor: Colors.white.withValues(alpha: 0.06),
+        backgroundColor: AppColors.primary.withValues(alpha: 0.2),
         disabledColor: Colors.grey[800],
-        selectedColor: AppColors.primaryLight,
-        labelStyle: AppTypography.body(fontSize: 12, weight: FontWeight.w700, color: Colors.grey[100]),
-        secondaryLabelStyle: AppTypography.body(fontSize: 12, weight: FontWeight.w700, color: const Color(0xFF10131C)),
+        selectedColor: AppColors.primary,
+        labelStyle: AppTypography.body(fontSize: 12, weight: FontWeight.w700, color: Colors.white),
+        secondaryLabelStyle: AppTypography.body(fontSize: 12, weight: FontWeight.w700, color: Colors.white),
         brightness: Brightness.dark,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         shape: StadiumBorder(
-          side: BorderSide(color: AppColors.primaryLight.withValues(alpha: 0.3)),
+          side: BorderSide(color: AppColors.primaryLight.withValues(alpha: 0.4)),
         ),
       ),
       switchTheme: SwitchThemeData(

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/reminder.dart';
 import '../providers/reminder_provider.dart';
 import '../utils/app_theme.dart';
+import '../widgets/live_geofence_preview_card.dart';
 import 'add_reminder_screen.dart';
 
 class ReminderDetailsScreen extends StatelessWidget {
@@ -104,26 +105,9 @@ class ReminderDetailsScreen extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 24),
-          Text('Location', style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: 6),
-          Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-              side: BorderSide(color: Colors.grey.shade300),
-            ),
-            child: ListTile(
-              leading: const Icon(Icons.location_on_rounded, color: AppColors.primary),
-              title: Text(reminder.locationName ?? 'Coordinates only'),
-              subtitle: Text(
-                '${reminder.latitude.toStringAsFixed(5)}, ${reminder.longitude.toStringAsFixed(5)}\n'
-                'Radius: ${reminder.radius.toInt()} m · '
-                '${reminder.notifyOnEnter ? 'Notify on arrival' : ''}'
-                '${reminder.notifyOnEnter && reminder.notifyOnExit ? ' & ' : ''}'
-                '${reminder.notifyOnExit ? 'Notify on exit' : ''}',
-              ),
-            ),
-          ),
+          Text('Location & Geofence Preview', style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 8),
+          LiveGeofencePreviewCard(reminder: reminder),
           if (reminder.dueDate != null) ...[
             const SizedBox(height: 24),
             Text('Due Date', style: Theme.of(context).textTheme.labelLarge),

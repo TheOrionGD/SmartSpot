@@ -23,22 +23,22 @@ class ApiService {
 
   String get _baseUrl => AuthService.baseUrl;
 
-  Future<Map<String, String>> _headers() async {
-    final token = await AuthService.instance.getToken();
-    return {
-      'Content-Type': 'application/json',
-      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-    };
-  }
-
   Future<dynamic> _send(
     String method,
     String path, {
     Map<String, String>? queryParameters,
     dynamic body,
   }) async {
+    final token = await AuthService.instance.getToken();
+    if (token == null || token.isEmpty) {
+      throw const ApiException('Authentication required (Guest mode)', statusCode: 401);
+    }
+
     try {
-      final headers = await _headers();
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
       var uri = Uri.parse('$_baseUrl$path');
       if (queryParameters != null && queryParameters.isNotEmpty) {
         uri = uri.replace(queryParameters: queryParameters);

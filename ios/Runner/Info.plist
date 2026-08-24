@@ -15,9 +15,23 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>smartspot</string>
+	<string>SmartSpot</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>SmartSpot requires your location to monitor geofences and alert you when arriving at your saved reminder locations.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>SmartSpot monitors geofence perimeters in the background so you receive timely notifications when arriving at target locations.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>SmartSpot uses the microphone for spoken voice input to quickly create location reminders.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>SmartSpot uses speech recognition to parse natural language voice reminders.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
 	<key>CFBundleShortVersionString</key>
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>

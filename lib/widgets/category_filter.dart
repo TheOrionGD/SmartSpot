@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../utils/app_theme.dart';
+import '../utils/app_motion.dart';
 import '../models/reminder.dart';
 import '../providers/reminder_provider.dart';
 
@@ -78,49 +79,46 @@ class CategoryFilter extends StatelessWidget {
   }
 
   Widget _buildFilterChip(
-      BuildContext context,
-      String label,
-      String? emoji,
-      bool isSelected, {
-        required Function(bool) onSelected,
-      }) {
+    BuildContext context,
+    String label,
+    String? emoji,
+    bool isSelected, {
+    required Function(bool) onSelected,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final animate = AppMotion.shouldAnimate(context);
 
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOutCubic,
+      duration: animate ? AppMotion.component : Duration.zero,
+      curve: AppMotion.springCurve,
       decoration: BoxDecoration(
         gradient: isSelected
             ? const LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryLight],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        )
+                colors: [AppColors.primary, AppColors.primaryLight],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
             : LinearGradient(
-          colors: [
-            isDark
-                ? Colors.grey[800]!
-                : Colors.grey[100]!,
-            isDark
-                ? Colors.grey[900]!
-                : Colors.grey[50]!,
-          ],
-        ),
+                colors: [
+                  isDark ? AppColors.surfaceDark : Colors.grey[100]!,
+                  isDark ? AppColors.surfaceDark : Colors.grey[50]!,
+                ],
+              ),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.5)
-              : AppColors.primary.withValues(alpha: 0.2),
-          width: 1.5,
+              ? AppColors.primary.withValues(alpha: 0.6)
+              : AppColors.primary.withValues(alpha: 0.18),
+          width: isSelected ? 1.8 : 1.2,
         ),
         boxShadow: isSelected
             ? [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ]
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.35),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ]
             : [],
       ),
       child: Material(
@@ -129,26 +127,33 @@ class CategoryFilter extends StatelessWidget {
           onTap: () => onSelected(!isSelected),
           borderRadius: BorderRadius.circular(18),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (emoji != null) ...[
-                  Text(
-                    emoji,
-                    style: const TextStyle(fontSize: 16),
+                  AnimatedScale(
+                    scale: isSelected ? 1.12 : 1.0,
+                    duration: animate ? AppMotion.micro : Duration.zero,
+                    curve: AppMotion.springCurve,
+                    child: Text(
+                      emoji,
+                      style: const TextStyle(fontSize: 16),
+                    ),
                   ),
                   const SizedBox(width: 6),
                 ],
-                Text(
-                  label,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+                AnimatedDefaultTextStyle(
+                  duration: animate ? AppMotion.micro : Duration.zero,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                     color: isSelected
                         ? Colors.white
-                        : (isDark ? Colors.grey[200] : const Color(0xFF10131C)),
+                        : (isDark ? Colors.grey[300] : const Color(0xFF10131C)),
                     letterSpacing: 0.3,
                   ),
+                  child: Text(label),
                 ),
               ],
             ),

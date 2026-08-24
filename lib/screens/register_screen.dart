@@ -3,6 +3,11 @@ import '../services/auth_service.dart';
 import '../utils/app_theme.dart';
 import 'main_navigation_shell.dart';
 
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/reminder_provider.dart';
+import '../providers/favorites_provider.dart';
+
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -38,16 +43,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await AuthService.instance.register(
-        name: _nameController.text,
-        email: _emailController.text,
-        password: _passwordController.text,
-        securityQuestion: _securityQuestionController.text,
-        securityAnswer: _securityAnswerController.text,
-      );
+      await context.read<AuthProvider>().register(
+            name: _nameController.text.trim(),
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+            securityQuestion: _securityQuestionController.text.trim(),
+            securityAnswer: _securityAnswerController.text.trim(),
+          );
+      if (mounted) {
+        context.read<ReminderProvider>().syncWithBackend();
+        context.read<FavoritesProvider>().loadFavorites();
+      }
     } on AuthException catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+      return;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Registration failed: $e')));
       }
       return;
     } finally {

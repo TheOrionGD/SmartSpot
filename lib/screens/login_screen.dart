@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../utils/app_theme.dart';
 import '../services/auth_service.dart';
+import '../providers/auth_provider.dart';
+import '../providers/reminder_provider.dart';
+import '../providers/favorites_provider.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 import 'main_navigation_shell.dart';
@@ -32,13 +36,22 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await AuthService.instance.login(
-        email: _emailController.text,
-        password: _passwordController.text,
-      );
+      await context.read<AuthProvider>().login(
+            _emailController.text.trim(),
+            _passwordController.text,
+          );
+      if (mounted) {
+        context.read<ReminderProvider>().syncWithBackend();
+        context.read<FavoritesProvider>().loadFavorites();
+      }
     } on AuthException catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+      return;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Login failed: $e')));
       }
       return;
     } finally {

@@ -5,6 +5,7 @@ import '../providers/reminder_provider.dart';
 import '../providers/settings_provider.dart';
 import '../utils/permission_helper.dart';
 import '../utils/app_theme.dart';
+import '../utils/app_translations.dart';
 
 
 class SettingsScreen extends StatefulWidget {
@@ -309,17 +310,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           ListTile(
             leading: const Icon(Icons.language, color: AppColors.primary),
-            title: const Text('Language'),
+            title: Text(AppTranslations.tr(context, 'language')),
             trailing: DropdownButton<String>(
-              value: settings.language,
+              value: AppTranslations.supportedLanguages.contains(settings.language)
+                  ? settings.language
+                  : 'English',
               underline: const SizedBox(),
-              items: const ['English', 'Hindi', 'Tamil', 'Spanish']
+              items: AppTranslations.supportedLanguages
                   .map((lang) => DropdownMenuItem(value: lang, child: Text(lang)))
                   .toList(),
               onChanged: (value) {
                 if (value != null) settings.setLanguage(value);
               },
             ),
+          ),
+          SwitchListTile(
+            secondary: const Icon(Icons.motion_photos_off_outlined, color: AppColors.primary),
+            title: const Text('Reduce Motion'),
+            subtitle: const Text('Minimize large scale and translation animations'),
+            value: settings.reducedMotion,
+            onChanged: (value) => settings.setReducedMotion(value),
           ),
           const Divider(),
           _sectionHeader('About'),

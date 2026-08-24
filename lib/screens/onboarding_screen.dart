@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'login_screen.dart';
 import '../utils/app_theme.dart';
+import '../utils/permission_helper.dart';
 
 class _OnboardPage {
   final IconData icon;
@@ -27,6 +28,9 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _controller = PageController();
   int _currentPage = 0;
+  bool _hasLocation = false;
+  bool _hasNotification = false;
+  bool _isRequestingPermissions = false;
 
   final List<_OnboardPage> _pages = const [
     _OnboardPage(
@@ -52,7 +56,67 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           'exactly when you\'re nearby, not at some random time.',
       color: AppColors.success,
     ),
+    _OnboardPage(
+      icon: Icons.verified_user_rounded,
+      title: 'Location & Notification Access',
+      description:
+          'To alert you the moment you arrive or leave a place, SmartSpot '
+          'needs location and notification permissions on your device.',
+      color: AppColors.periwinkle,
+    ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _checkCurrentPermissions();
+  }
+
+  Future<void> _checkCurrentPermissions() async {
+    final loc = await PermissionHelper.hasLocationPermission();
+    final notif = await PermissionHelper.hasNotificationPermission();
+    if (mounted) {
+      setState(() {
+        _hasLocation = loc;
+        _hasNotification = notif;
+      });
+    }
+  }
+
+  Future<void> _requestLocationAccess() async {
+    setState(() => _isRequestingPermissions = true);
+    try {
+      final granted = await PermissionHelper.requestLocationPermission(context);
+      if (granted && mounted) {
+        await PermissionHelper.requestBackgroundLocationPermission(context);
+      }
+    } finally {
+      await _checkCurrentPermissions();
+      if (mounted) setState(() => _isRequestingPermissions = false);
+    }
+  }
+
+  Future<void> _requestNotificationAccess() async {
+    setState(() => _isRequestingPermissions = true);
+    try {
+      await PermissionHelper.requestNotificationPermission(context);
+    } finally {
+      await _checkCurrentPermissions();
+      if (mounted) setState(() => _isRequestingPermissions = false);
+    }
+  }
+
+  Future<void> _handleGetStarted() async {
+    if (!_hasLocation || !_hasNotification) {
+      if (!_hasLocation) {
+        await PermissionHelper.requestLocationPermission(context);
+      }
+      if (!_hasNotification && mounted) {
+        await PermissionHelper.requestNotificationPermission(context);
+      }
+    }
+    await _finish();
+  }
 
   Future<void> _finish() async {
     final prefs = await SharedPreferences.getInstance();
@@ -93,24 +157,31 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: PageView.builder(
                 controller: _controller,
                 itemCount: _pages.length,
-                onPageChanged: (index) => setState(() => _currentPage = index),
+                onPageChanged: (index) {
+                  setState(() => _currentPage = index);
+                  if (index == 3) {
+                    _checkCurrentPermissions();
+                  }
+                },
                 itemBuilder: (context, index) {
                   final page = _pages[index];
+                  final isPermissionPage = index == 3;
+
                   return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Container(
-                          width: 160,
-                          height: 160,
+                          width: 140,
+                          height: 140,
                           decoration: BoxDecoration(
                             color: page.color.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(page.icon, size: 80, color: page.color),
+                          child: Icon(page.icon, size: 70, color: page.color),
                         ),
-                        const SizedBox(height: 40),
+                        const SizedBox(height: 28),
                         Text(
                           page.title,
                           textAlign: TextAlign.center,
@@ -118,7 +189,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 fontWeight: FontWeight.bold,
                               ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         Text(
                           page.description,
                           textAlign: TextAlign.center,
@@ -127,6 +198,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 height: 1.5,
                               ),
                         ),
+                        if (isPermissionPage) ...[
+                          const SizedBox(height: 28),
+                          _permissionTile(
+                            title: 'Location Access',
+                            subtitle: _hasLocation
+                                ? 'Permission Granted'
+                                : 'Needed to trigger geofence alerts',
+                            icon: Icons.my_location_rounded,
+                            isGranted: _hasLocation,
+                            onTap: _isRequestingPermissions ? null : _requestLocationAccess,
+                          ),
+                          const SizedBox(height: 12),
+                          _permissionTile(
+                            title: 'Notification Access',
+                            subtitle: _hasNotification
+                                ? 'Permission Granted'
+                                : 'Needed to show timely reminder alerts',
+                            icon: Icons.notifications_active_rounded,
+                            isGranted: _hasNotification,
+                            onTap: _isRequestingPermissions ? null : _requestNotificationAccess,
+                          ),
+                        ],
                       ],
                     ),
                   );
@@ -151,7 +244,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 28),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: SizedBox(
@@ -175,7 +268,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       borderRadius: BorderRadius.circular(24),
                       onTap: () {
                         if (isLastPage) {
-                          _finish();
+                          _handleGetStarted();
                         } else {
                           _controller.nextPage(
                             duration: const Duration(milliseconds: 300),
@@ -202,6 +295,72 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             const SizedBox(height: 24),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _permissionTile({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool isGranted,
+    required VoidCallback? onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isGranted
+            ? AppColors.sage.withValues(alpha: 0.12)
+            : Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isGranted
+              ? AppColors.sage.withValues(alpha: 0.4)
+              : AppColors.primary.withValues(alpha: 0.2),
+          width: 1.2,
+        ),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: isGranted
+                ? AppColors.sage.withValues(alpha: 0.2)
+                : AppColors.primary.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            isGranted ? Icons.check_circle_rounded : icon,
+            color: isGranted ? AppColors.sage : AppColors.primary,
+            size: 24,
+          ),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: 12,
+            color: isGranted ? AppColors.sage : Colors.grey[600],
+          ),
+        ),
+        trailing: isGranted
+            ? const Icon(Icons.check_rounded, color: AppColors.sage)
+            : ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  minimumSize: const Size(60, 32),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: onTap,
+                child: const Text('Allow', style: TextStyle(fontSize: 12)),
+              ),
       ),
     );
   }

@@ -1,18 +1,12 @@
 import 'package:flutter/material.dart';
 import '../services/voice_parser_service.dart';
 import '../utils/app_theme.dart';
+import '../utils/app_translations.dart';
 
 /// Feature 6 — Natural-Language Voice Reminders.
 ///
-/// This sheet takes typed (or, once a speech-to-text package is wired in,
-/// transcribed) free-form text like "remind me to buy milk when I reach
-/// Reliance tomorrow evening" and parses it into structured fields via
-/// [VoiceParserService].
-///
-/// Deliberately decoupled from any specific speech-to-text plugin: hook a
-/// mic button up to `speech_to_text` (or any STT source) and feed its
-/// transcript into [controller.text] — everything below only cares about
-/// the resulting string, not how it got there.
+/// Takes typed or transcribed free-form text and parses it into structured
+/// reminder fields via [VoiceParserService].
 class VoiceInputSheet extends StatefulWidget {
   const VoiceInputSheet({super.key});
 
@@ -24,9 +18,7 @@ class VoiceInputSheet extends StatefulWidget {
     return showModalBottomSheet<ParsedReminder>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (_) => const VoiceInputSheet(),
     );
   }
@@ -43,31 +35,59 @@ class _VoiceInputSheetState extends State<VoiceInputSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Padding(
+
+    return Container(
       padding: EdgeInsets.only(
         left: 20,
         right: 20,
         top: 20,
         bottom: MediaQuery.of(context).viewInsets.bottom + 20,
       ),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[400],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           Row(
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
                   gradient: AppColors.primaryGradient,
                   borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.35),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                child: const Icon(Icons.mic_rounded, color: Colors.white),
+                child: const Icon(Icons.mic_rounded, color: Colors.white, size: 24),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
-                child: Text('Voice / Quick Add', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontSize: 16)),
+                child: Text(
+                  AppTranslations.tr(context, 'voice_quick_add'),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
               ),
               IconButton(
                 icon: const Icon(Icons.close_rounded),
@@ -75,21 +95,21 @@ class _VoiceInputSheetState extends State<VoiceInputSheet> {
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Text(
-            'Type (or speak, if your app has mic input wired up) something like '
-            '"remind me to buy milk when I reach Reliance tomorrow evening".',
-            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+            'Type (or speak) something like "remind me to buy milk when I reach Reliance tomorrow evening".',
+            style: TextStyle(fontSize: 13, color: isDark ? Colors.grey[400] : Colors.grey[600]),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           TextField(
             controller: _controller,
             autofocus: true,
             maxLines: 3,
             onChanged: _updatePreview,
-            decoration: const InputDecoration(
-              hintText: 'Remind me to…',
-              prefixIcon: Icon(Icons.chat_bubble_outline_rounded, color: AppColors.primary),
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+            decoration: InputDecoration(
+              hintText: AppTranslations.tr(context, 'remind_me_to'),
+              prefixIcon: const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.primary),
             ),
           ),
           if (_preview != null) ...[
@@ -98,9 +118,9 @@ class _VoiceInputSheetState extends State<VoiceInputSheet> {
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: isDark ? Colors.grey[850] : Colors.grey[50],
+                color: isDark ? AppColors.surfaceDark : Colors.grey[100],
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,25 +137,40 @@ class _VoiceInputSheetState extends State<VoiceInputSheet> {
               ),
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
-            height: 50,
+            height: 52,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: _preview == null ? null : AppColors.primaryGradient,
-                color: _preview == null ? Colors.grey[300] : null,
-                borderRadius: BorderRadius.circular(20),
+                color: _preview == null ? (isDark ? Colors.grey[800] : Colors.grey[300]) : null,
+                borderRadius: BorderRadius.circular(22),
+                boxShadow: _preview == null
+                    ? []
+                    : [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.35),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
               ),
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(22),
                   onTap: _preview == null ? null : () => Navigator.pop(context, _preview),
-                  child: const Center(
+                  child: Center(
                     child: Text(
-                      'Use this',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                      AppTranslations.tr(context, 'use_this'),
+                      style: TextStyle(
+                        color: _preview == null
+                            ? (isDark ? Colors.grey[500] : Colors.grey[600])
+                            : Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                 ),
@@ -152,10 +187,10 @@ class _VoiceInputSheetState extends State<VoiceInputSheet> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Icon(icon, size: 15, color: AppColors.primary),
+          Icon(icon, size: 16, color: AppColors.primary),
           const SizedBox(width: 8),
-          Text('$label: ', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 12))),
+          Text('$label: ', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
         ],
       ),
     );

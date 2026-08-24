@@ -129,15 +129,25 @@ test('SmartSpot Backend End-to-End API Test Suite', async (t) => {
     assert.equal(res.body.user.email, 'student@example.com');
   });
 
-  await t.test('PUT /api/auth/profile - updates user name', async () => {
+  await t.test('PUT /api/auth/profile - updates user full profile', async () => {
     const res = await request('/api/auth/profile', {
       method: 'PUT',
       headers: { Authorization: `Bearer ${token}` },
-      body: { name: 'Updated Student' },
+      body: {
+        name: 'Updated Student',
+        phone: '+1 555-0199',
+        bio: 'CS Student & Tech Enthusiast',
+        avatarUrl: 'person_rounded',
+        securityQuestion: 'Updated Security Question?',
+      },
     });
 
     assert.equal(res.status, 200);
     assert.equal(res.body.user.name, 'Updated Student');
+    assert.equal(res.body.user.phone, '+1 555-0199');
+    assert.equal(res.body.user.bio, 'CS Student & Tech Enthusiast');
+    assert.equal(res.body.user.avatarUrl, 'person_rounded');
+    assert.equal(res.body.user.securityQuestion, 'Updated Security Question?');
   });
 
   await t.test('POST /api/reminders - creates location reminder', async () => {

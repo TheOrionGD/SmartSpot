@@ -9,6 +9,7 @@ import '../utils/permission_helper.dart';
 import '../utils/app_theme.dart';
 import '../widgets/multi_condition_builder.dart';
 import '../widgets/voice_input_sheet.dart';
+import '../utils/app_motion.dart';
 import 'map_screen.dart';
 import 'favorites_screen.dart';
 
@@ -51,6 +52,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
   String? _locationName;
 
   bool _isSaving = false;
+  bool _shakeForm = false;
 
   @override
   void initState() {
@@ -213,9 +215,13 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      setState(() => _shakeForm = true);
+      return;
+    }
 
     if (_latitude == null || _longitude == null) {
+      setState(() => _shakeForm = true);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
@@ -395,9 +401,12 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
             ),
         ],
       ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
+      body: ErrorShakeWidget(
+        shake: _shakeForm,
+        onShakeComplete: () => setState(() => _shakeForm = false),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -910,8 +919,9 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   // ---- Reusable premium UI helpers ----
 

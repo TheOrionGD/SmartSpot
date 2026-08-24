@@ -36,16 +36,21 @@ class MultiConditionBuilder extends StatelessWidget {
                     conditions[i].label,
                     style: TextStyle(
                       fontSize: 12,
-                      color: isDark ? AppColors.primaryLight : AppColors.primaryDark,
-                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : AppColors.primaryDark,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                  side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+                  backgroundColor: isDark
+                      ? AppColors.primary.withValues(alpha: 0.3)
+                      : AppColors.primary.withValues(alpha: 0.15),
+                  side: BorderSide(
+                    color: isDark ? AppColors.primaryLight : AppColors.primary,
+                    width: 1.2,
+                  ),
                   deleteIcon: Icon(
                     Icons.close_rounded,
                     size: 16,
-                    color: isDark ? AppColors.primaryLight : AppColors.primaryDark,
+                    color: isDark ? Colors.white : AppColors.primaryDark,
                   ),
                   onDeleted: () => _removeAt(i),
                 ),
@@ -74,24 +79,32 @@ class MultiConditionBuilder extends StatelessWidget {
 
     return OutlinedButton.icon(
       onPressed: onTap,
-      icon: Icon(icon, size: 14, color: isDark ? AppColors.primaryLight : AppColors.primaryDark),
+      icon: Icon(
+        icon,
+        size: 15,
+        color: isDark ? AppColors.primaryLight : AppColors.primary,
+      ),
       label: Text(
         label,
         style: TextStyle(
           fontSize: 12,
-          color: isDark ? Colors.grey[200] : const Color(0xFF2D3142),
-          fontWeight: FontWeight.w600,
+          color: isDark ? Colors.white : const Color(0xFF10131C),
+          fontWeight: FontWeight.w700,
         ),
       ),
       style: OutlinedButton.styleFrom(
         foregroundColor: isDark ? AppColors.primaryLight : AppColors.primaryDark,
-        backgroundColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.03),
+        backgroundColor: isDark
+            ? AppColors.primary.withValues(alpha: 0.18)
+            : AppColors.primary.withValues(alpha: 0.08),
         side: BorderSide(
           color: isDark
-              ? AppColors.primaryLight.withValues(alpha: 0.3)
-              : AppColors.primary.withValues(alpha: 0.3),
+              ? AppColors.primaryLight.withValues(alpha: 0.5)
+              : AppColors.primary.withValues(alpha: 0.4),
+          width: 1.2,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
