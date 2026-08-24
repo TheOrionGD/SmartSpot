@@ -60,17 +60,18 @@ projects:
 
 ## 📱 Connecting the Flutter App to Render Backend
 
-Once your backend is deployed, Render will provide a live URL such as:
-`https://smartspot-backend.onrender.com`
+Live Backend URL:
+`https://smartspot-backend-55n9.onrender.com`
 
 ### Verification
 Test the health check endpoint in your browser or terminal:
 ```bash
-curl https://smartspot-backend.onrender.com/health
+curl https://smartspot-backend-55n9.onrender.com/health
 ```
 
-### Running & Building Flutter with Live API URL
+### Running & Building Flutter
+*(The app now defaults to the live Render URL automatically!)*
 ```powershell
-flutter run -d windows --dart-define=API_BASE_URL=https://smartspot-backend.onrender.com
-flutter build web --release --dart-define=API_BASE_URL=https://smartspot-backend.onrender.com
+flutter run -d windows
+flutter build web --release
 ```

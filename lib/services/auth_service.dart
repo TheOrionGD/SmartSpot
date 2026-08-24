@@ -17,7 +17,7 @@ class AuthService {
 
   static final AuthService instance = AuthService._();
   static const _tokenKey = 'auth_token';
-  static const _defaultBaseUrl = 'http://localhost:3000';
+  static const _defaultBaseUrl = 'https://smartspot-backend-55n9.onrender.com';
   static const baseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: _defaultBaseUrl,
