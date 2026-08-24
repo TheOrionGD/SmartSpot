@@ -97,8 +97,18 @@ function auth(req, res, next) {
 }
 
 // ---------------------------------------------------------------------------
-// Health check
+// Root Landing & Health check
 // ---------------------------------------------------------------------------
+app.get('/', (_req, res) =>
+  res.json({
+    status: 'online',
+    message: 'Welcome to SmartSpot Location Reminders REST API',
+    health: '/health',
+    documentation: 'https://github.com/TheOrionGD/SmartSpot',
+    timestamp: now(),
+  })
+);
+
 app.get('/health', (_req, res) =>
   res.json({ ok: true, service: 'smartspot-backend', timestamp: now() })
 );

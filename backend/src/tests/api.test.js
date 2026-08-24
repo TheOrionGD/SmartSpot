@@ -61,6 +61,13 @@ test('SmartSpot Backend End-to-End API Test Suite', async (t) => {
   let groupId = null;
   let inviteCode = null;
 
+  await t.test('GET / - returns landing info', async () => {
+    const res = await request('/');
+    assert.equal(res.status, 200);
+    assert.equal(res.body.status, 'online');
+    assert.equal(res.body.health, '/health');
+  });
+
   await t.test('GET /health - returns ok', async () => {
     const res = await request('/health');
     assert.equal(res.status, 200);
