@@ -31,10 +31,5 @@ projects:
       buildCommand: npm install
       startCommand: npm start
       healthCheckPath: /health
-      disk:
-        name: smartspot-data
-        mountPath: /app/backend/data
-        sizeGB: 1
       autoDeployTrigger: commit
       rootDir: backend
-
