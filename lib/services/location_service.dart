@@ -5,6 +5,8 @@ import '../models/reminder.dart';
 import 'adaptive_service.dart';
 import 'context_signals_service.dart';
 import 'intelligence_service.dart';
+import 'notification_service.dart';
+
 
 /// Continuously monitors device location and evaluates it against each
 /// active reminder's geofence, calling [onGeofenceEvent] on enter/exit
@@ -29,6 +31,7 @@ class GeofenceLocationService {
 
   StreamSubscription<Position>? _positionSubscription;
   final Map<String, bool> _insideZone = {};
+  final Map<String, bool> _approachingZone = {};
   Position? _previousPosition;
   LocationTier _currentTier = LocationTier.normal;
 
@@ -46,21 +49,28 @@ class GeofenceLocationService {
   /// without needing to restart the stream when reminders change.
   Future<bool> start({
     required List<Reminder> Function() getReminders,
-    required void Function(Reminder reminder, bool isEnter) onGeofenceEvent,
+    required void Function(Reminder reminder, bool isEnter, double edgeDistanceMeters) onGeofenceEvent,
+    void Function(Reminder reminder, double edgeDistanceMeters)? onApproachingEvent,
   }) async {
     if (_positionSubscription != null) return true;
 
     final hasPermission = await _ensurePermission();
     if (!hasPermission) return false;
 
-    _startStream(LocationTier.normal, getReminders, onGeofenceEvent);
+    _startStream(
+      LocationTier.normal,
+      getReminders,
+      onGeofenceEvent,
+      onApproachingEvent,
+    );
     return true;
   }
 
   void _startStream(
     LocationTier tier,
     List<Reminder> Function() getReminders,
-    void Function(Reminder reminder, bool isEnter) onGeofenceEvent,
+    void Function(Reminder reminder, bool isEnter, double edgeDistanceMeters) onGeofenceEvent,
+    void Function(Reminder reminder, double edgeDistanceMeters)? onApproachingEvent,
   ) {
     _currentTier = tier;
     final locationSettings = _buildLocationSettings(tier);
@@ -69,7 +79,12 @@ class GeofenceLocationService {
       _positionSubscription = Geolocator.getPositionStream(
         locationSettings: locationSettings,
       ).listen(
-        (position) => _evaluate(position, getReminders, onGeofenceEvent),
+        (position) => _evaluate(
+          position,
+          getReminders,
+          onGeofenceEvent,
+          onApproachingEvent,
+        ),
         onError: (Object e) {
           debugPrint('GeofenceLocationService stream error: $e');
         },
@@ -85,19 +100,29 @@ class GeofenceLocationService {
   void _maybeRetierStream(
     LocationTier newTier,
     List<Reminder> Function() getReminders,
-    void Function(Reminder reminder, bool isEnter) onGeofenceEvent,
+    void Function(Reminder reminder, bool isEnter, double edgeDistanceMeters) onGeofenceEvent,
+    void Function(Reminder reminder, double edgeDistanceMeters)? onApproachingEvent,
   ) {
     if (newTier == _currentTier || _positionSubscription == null) return;
     _positionSubscription?.cancel();
-    _startStream(newTier, getReminders, onGeofenceEvent);
+    _startStream(
+      newTier,
+      getReminders,
+      onGeofenceEvent,
+      onApproachingEvent,
+    );
   }
 
   Future<void> stop() async {
     await _positionSubscription?.cancel();
     _positionSubscription = null;
     _insideZone.clear();
+    _approachingZone.clear();
     _previousPosition = null;
     _activityService.reset();
+    try {
+      await NotificationService.instance.cancelLiveGuidanceNotification();
+    } catch (_) {}
   }
 
   Future<bool> _ensurePermission() async {
@@ -144,13 +169,15 @@ class GeofenceLocationService {
   Future<void> _evaluate(
     Position position,
     List<Reminder> Function() getReminders,
-    void Function(Reminder reminder, bool isEnter) onGeofenceEvent,
+    void Function(Reminder reminder, bool isEnter, double edgeDistanceMeters) onGeofenceEvent,
+    void Function(Reminder reminder, double edgeDistanceMeters)? onApproachingEvent,
   ) async {
     final reminders = getReminders();
     final activeIds = reminders.map((r) => r.id).toSet();
     // Drop tracked state for reminders that are no longer active
     // (completed/archived/deleted) so stale entries don't linger.
     _insideZone.removeWhere((id, _) => !activeIds.contains(id));
+    _approachingZone.removeWhere((id, _) => !activeIds.contains(id));
 
     // --- Feature 9: classify current activity from GPS speed ---
     _lastActivity = _activityService.classify(position);
@@ -166,7 +193,12 @@ class GeofenceLocationService {
       activity: _lastActivity,
       distanceToNearestReminderMeters: nearestDistance,
     );
-    _maybeRetierStream(tier, getReminders, onGeofenceEvent);
+    _maybeRetierStream(
+      tier,
+      getReminders,
+      onGeofenceEvent,
+      onApproachingEvent,
+    );
 
     for (final reminder in reminders) {
       // Recurring reminders only count on days that match their schedule
@@ -190,10 +222,16 @@ class GeofenceLocationService {
         reminder.longitude,
       );
       final isInside = distance <= effectiveRadius;
+      final isApproaching = !isInside && distance <= (effectiveRadius * 1.5);
       final wasInside = _insideZone[reminder.id] ?? false;
+      final wasApproaching = _approachingZone[reminder.id] ?? false;
+      final edgeDistance = (distance - effectiveRadius) < 0.0
+          ? 0.0
+          : (distance - effectiveRadius);
 
       if (isInside && !wasInside) {
         _insideZone[reminder.id] = true;
+        _approachingZone[reminder.id] = false;
         if (!reminder.notifyOnEnter) continue;
 
         final allowed = await _passesIntelligentGates(reminder, position);
@@ -208,13 +246,61 @@ class GeofenceLocationService {
           category: reminder.category,
         ));
 
-        onGeofenceEvent(reminder, true);
+        onGeofenceEvent(reminder, true, edgeDistance);
       } else if (!isInside && wasInside) {
         _insideZone[reminder.id] = false;
-        if (reminder.notifyOnExit) onGeofenceEvent(reminder, false);
+        _approachingZone[reminder.id] = isApproaching;
+        if (reminder.notifyOnExit) {
+          onGeofenceEvent(reminder, false, edgeDistance);
+        }
       } else {
         _insideZone[reminder.id] = isInside;
+        if (isApproaching && !wasApproaching && !wasInside) {
+          _approachingZone[reminder.id] = true;
+          onApproachingEvent?.call(reminder, edgeDistance);
+        } else if (!isApproaching) {
+          _approachingZone[reminder.id] = false;
+        }
       }
+    }
+
+    // Google Maps-style live perimeter navigation / guidance notification
+    if (reminders.isNotEmpty) {
+      Reminder? closest;
+      double minEdge = double.infinity;
+      String statusTag = 'Outside Perimeter';
+
+      for (final r in reminders) {
+        final dist = Geolocator.distanceBetween(
+          position.latitude,
+          position.longitude,
+          r.latitude,
+          r.longitude,
+        );
+        final edge = (dist - r.radius) < 0.0 ? 0.0 : (dist - r.radius);
+        if (edge < minEdge) {
+          minEdge = edge;
+          closest = r;
+          if (dist <= r.radius) {
+            statusTag = 'Inside Perimeter';
+          } else if (dist <= r.radius * 1.5) {
+            statusTag = 'Approaching Spot';
+          } else {
+            statusTag = 'Outside Perimeter';
+          }
+        }
+      }
+
+      if (closest != null) {
+        unawaited(NotificationService.instance.updateLivePerimeterGuidanceNotification(
+          activeSpotTitle: closest.title,
+          statusTag: statusTag,
+          edgeDistanceMeters: minEdge,
+          totalActiveSpots: reminders.length,
+        ));
+      }
+    } else {
+      unawaited(NotificationService.instance.cancelLiveGuidanceNotification());
     }
 
     _previousPosition = position;

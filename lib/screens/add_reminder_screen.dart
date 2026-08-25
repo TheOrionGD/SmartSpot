@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart' as ll;
 import 'package:provider/provider.dart';
 import '../models/reminder.dart';
 import '../models/reminder_condition.dart';
@@ -128,6 +130,24 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
     super.dispose();
   }
 
+  String _formatPerimeterDistance(double r) {
+    final circumference = 2 * 3.141592653589793 * r;
+    if (circumference < 1000) {
+      return '${circumference.toInt()} m';
+    } else {
+      return '${(circumference / 1000).toStringAsFixed(2)} km';
+    }
+  }
+
+  String _formatCoverageArea(double r) {
+    final areaSqM = 3.141592653589793 * r * r;
+    if (areaSqM < 1000000) {
+      return '${areaSqM.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} m²';
+    } else {
+      return '${(areaSqM / 1000000).toStringAsFixed(2)} km²';
+    }
+  }
+
   Future<void> _pickLocation() async {
     final result = await Navigator.push<PickedLocation>(
       context,
@@ -135,6 +155,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
         builder: (_) => MapScreen(
           initialLatitude: _latitude,
           initialLongitude: _longitude,
+          initialRadius: radius,
         ),
       ),
     );
@@ -144,6 +165,9 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
         _latitude = result.latitude;
         _longitude = result.longitude;
         _locationName = result.address;
+        if (result.radius != null) {
+          radius = result.radius!;
+        }
       });
     }
   }
@@ -582,39 +606,133 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
               const SizedBox(height: 4),
               _premiumCard(
                 isDark,
-                child: Row(
+                child: Column(
                   children: [
-                    _goldIconBadge(Icons.location_on_rounded),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _locationName ?? 'No location selected',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark ? Colors.white : Colors.black87,
+                    Row(
+                      children: [
+                        _goldIconBadge(Icons.location_on_rounded),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _locationName ?? 'No location selected',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark ? Colors.white : Colors.black87,
+                                    ),
+                              ),
+                              if (_latitude != null) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${_latitude!.toStringAsFixed(5)}, ${_longitude!.toStringAsFixed(5)}',
+                                  style: Theme.of(context).textTheme.bodySmall,
                                 ),
+                              ],
+                            ],
                           ),
-                          if (_latitude != null) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              '${_latitude!.toStringAsFixed(5)}, ${_longitude!.toStringAsFixed(5)}',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        ],
+                        ),
+                        const SizedBox(width: 8),
+                        _goldOutlineButton(
+                          icon: Icons.map_rounded,
+                          label: 'Select',
+                          onPressed: _pickLocation,
+                        ),
+                      ],
+                    ),
+                    if (_latitude != null && _longitude != null) ...[
+                      const SizedBox(height: 12),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: SizedBox(
+                          height: 130,
+                          width: double.infinity,
+                          child: Stack(
+                            children: [
+                              FlutterMap(
+                                options: MapOptions(
+                                  initialCenter: ll.LatLng(_latitude!, _longitude!),
+                                  initialZoom: 15.0,
+                                  interactionOptions: const InteractionOptions(
+                                    flags: InteractiveFlag.none,
+                                  ),
+                                ),
+                                children: [
+                                  TileLayer(
+                                    urlTemplate: isDark
+                                        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+                                        : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                                    subdomains: const ['a', 'b', 'c', 'd'],
+                                    userAgentPackageName: 'com.smartspot.app',
+                                    maxZoom: 19,
+                                  ),
+                                  CircleLayer(
+                                    circles: [
+                                      CircleMarker(
+                                        point: ll.LatLng(_latitude!, _longitude!),
+                                        radius: radius,
+                                        useRadiusInMeter: true,
+                                        color: AppColors.primary.withValues(alpha: isDark ? 0.28 : 0.2),
+                                        borderColor: AppColors.primary,
+                                        borderStrokeWidth: 2.2,
+                                      ),
+                                    ],
+                                  ),
+                                  MarkerLayer(
+                                    markers: [
+                                      Marker(
+                                        point: ll.LatLng(_latitude!, _longitude!),
+                                        width: 32,
+                                        height: 32,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary,
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: AppColors.primary.withValues(alpha: 0.4),
+                                                blurRadius: 6,
+                                              ),
+                                            ],
+                                          ),
+                                          child: const Icon(
+                                            Icons.location_on_rounded,
+                                            color: Colors.white,
+                                            size: 18,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              Positioned(
+                                bottom: 6,
+                                right: 6,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.65),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    'Covered Perimeter: ${_formatPerimeterDistance(radius)}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    _goldOutlineButton(
-                      icon: Icons.map_rounded,
-                      label: 'Select',
-                      onPressed: _pickLocation,
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -632,7 +750,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                 ),
 
               const SizedBox(height: 20),
-              _sectionHeader(context, icon: Icons.radar_rounded, title: 'Geofence Radius'),
+              _sectionHeader(context, icon: Icons.radar_rounded, title: 'Geofence Radius & Perimeter'),
               const SizedBox(height: 12),
               _premiumCard(
                 isDark,
@@ -662,6 +780,31 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 12),
+
+                    // Covered Circle Distance & Perimeter Metrics Bar
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: isDark ? 0.15 : 0.08),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildPerimeterMetric('Radius', '${radius.toInt()} m', Icons.radar_rounded),
+                          Container(width: 1, height: 26, color: AppColors.primary.withValues(alpha: 0.3)),
+                          _buildPerimeterMetric('Perimeter', _formatPerimeterDistance(radius), Icons.all_inclusive_rounded),
+                          Container(width: 1, height: 26, color: AppColors.primary.withValues(alpha: 0.3)),
+                          _buildPerimeterMetric('Area', _formatCoverageArea(radius), Icons.circle_outlined),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
                     SliderTheme(
                       data: SliderTheme.of(context).copyWith(
                         activeTrackColor: AppColors.primary,
@@ -1043,6 +1186,38 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
           value: value,
           activeTrackColor: AppColors.primary,
           onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPerimeterMetric(String label, String value, IconData icon) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: AppColors.primary),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[500],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w800,
+            color: AppColors.primary,
+          ),
         ),
       ],
     );

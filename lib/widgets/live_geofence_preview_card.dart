@@ -6,7 +6,9 @@ import 'package:provider/provider.dart';
 import '../models/reminder.dart';
 import '../providers/live_location_provider.dart';
 import '../screens/live_map_screen.dart';
+import '../screens/perimeter_alert_screen.dart';
 import '../utils/app_theme.dart';
+
 import '../utils/app_motion.dart';
 
 /// Embedded real-time live location & geofence preview card.
@@ -73,6 +75,23 @@ class LiveGeofencePreviewCard extends StatelessWidget {
       AppPageRoute(
         builder: (_) => LiveMapScreen(reminder: reminder),
       ),
+    );
+  }
+
+  void _openPerimeterAlert(BuildContext context, GeofenceState state, double? edgeDistance) {
+    AlertPerimeterType alertType;
+    if (state == GeofenceState.inside) {
+      alertType = AlertPerimeterType.inside;
+    } else if (state == GeofenceState.approaching) {
+      alertType = AlertPerimeterType.approaching;
+    } else {
+      alertType = AlertPerimeterType.outside;
+    }
+    PerimeterAlertScreen.show(
+      context,
+      reminder: reminder,
+      alertType: alertType,
+      edgeDistanceMeters: edgeDistance,
     );
   }
 
@@ -173,39 +192,43 @@ class LiveGeofencePreviewCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Live Status Pill
-                AnimatedContainer(
-                  duration: animate ? AppMotion.component : Duration.zero,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: statusColor.withValues(alpha: 0.4)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _getStatusIcon(geofenceState),
-                        size: 12,
-                        color: statusColor,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _getStatusLabel(geofenceState),
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w800,
+                // Live Status Pill (Tappable to launch full vibration & alert screen)
+                GestureDetector(
+                  onTap: () => _openPerimeterAlert(context, geofenceState, edgeDistanceMeters),
+                  child: AnimatedContainer(
+                    duration: animate ? AppMotion.component : Duration.zero,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: statusColor.withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _getStatusIcon(geofenceState),
+                          size: 12,
                           color: statusColor,
-                          letterSpacing: 0.4,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Text(
+                          _getStatusLabel(geofenceState),
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w800,
+                            color: statusColor,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
             ),
           ),
+
 
           // Embedded Interactive Mini Live Map Preview
           ClipRRect(
@@ -235,6 +258,7 @@ class LiveGeofencePreviewCard extends StatelessWidget {
                             ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
                             : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
                         subdomains: const ['a', 'b', 'c', 'd'],
+                        retinaMode: RetinaMode.isHighDensity(context),
                         userAgentPackageName: 'com.smartspot.app',
                         maxZoom: 19,
                       ),
@@ -333,58 +357,67 @@ class LiveGeofencePreviewCard extends StatelessWidget {
                     top: 8,
                     left: 8,
                     right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF1E2430).withValues(alpha: 0.95)
-                            : Colors.white.withValues(alpha: 0.92),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: geofenceState == GeofenceState.outside
-                              ? AppColors.error.withValues(alpha: 0.6)
-                              : statusColor.withValues(alpha: 0.3),
-                          width: 1,
-                        ),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black12,
-                            blurRadius: 4,
+                    child: GestureDetector(
+                      onTap: () => _openPerimeterAlert(context, geofenceState, edgeDistanceMeters),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF1E2430).withValues(alpha: 0.95)
+                              : Colors.white.withValues(alpha: 0.92),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: geofenceState == GeofenceState.outside
+                                ? AppColors.error.withValues(alpha: 0.6)
+                                : statusColor.withValues(alpha: 0.3),
+                            width: 1,
                           ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            geofenceState == GeofenceState.inside
-                                ? Icons.check_circle_rounded
-                                : (geofenceState == GeofenceState.outside
-                                    ? Icons.warning_amber_rounded
-                                    : Icons.info_outline_rounded),
-                            size: 13,
-                            color: statusColor,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              geofenceState == GeofenceState.inside
-                                  ? 'Inside perimeter! Spot trigger active.'
-                                  : (geofenceState == GeofenceState.approaching
-                                      ? 'Approaching spot ($formattedEdgeDistance to perimeter)'
-                                      : 'Outside perimeter ($formattedEdgeDistance to perimeter edge)'),
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w700,
-                                color: geofenceState == GeofenceState.outside
-                                    ? (isDark ? const Color(0xFFFF6B6B) : AppColors.error)
-                                    : (isDark ? Colors.white : Colors.black87),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black12,
+                              blurRadius: 4,
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              geofenceState == GeofenceState.inside
+                                  ? Icons.check_circle_rounded
+                                  : (geofenceState == GeofenceState.outside
+                                      ? Icons.warning_amber_rounded
+                                      : Icons.info_outline_rounded),
+                              size: 13,
+                              color: statusColor,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                geofenceState == GeofenceState.inside
+                                    ? 'Inside perimeter! Spot trigger active.'
+                                    : (geofenceState == GeofenceState.approaching
+                                        ? 'Approaching spot ($formattedEdgeDistance to perimeter)'
+                                        : 'Outside perimeter ($formattedEdgeDistance to perimeter edge)'),
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: geofenceState == GeofenceState.outside
+                                      ? (isDark ? const Color(0xFFFF6B6B) : AppColors.error)
+                                      : (isDark ? Colors.white : Colors.black87),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.touch_app_rounded,
+                              size: 12,
+                              color: statusColor.withValues(alpha: 0.7),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),

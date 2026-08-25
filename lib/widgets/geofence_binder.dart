@@ -32,7 +32,7 @@ class _GeofenceBinderState extends State<GeofenceBinder> {
   // each other). Rather than firing a notification per event immediately,
   // events are collected here and flushed together shortly after, so they
   // can be evaluated as a batch (for bundling) and against quiet hours.
-  final List<({Reminder reminder, bool isEnter})> _pendingEvents = [];
+  final List<({Reminder reminder, bool isEnter, double? edgeDistanceMeters})> _pendingEvents = [];
   Timer? _flushTimer;
 
   @override
@@ -53,8 +53,10 @@ class _GeofenceBinderState extends State<GeofenceBinder> {
     if (settings.backgroundMonitoring && !_monitoringActive) {
       final started = await GeofenceLocationService.instance.start(
         getReminders: () => _reminderProvider.allReminders,
-        onGeofenceEvent: (reminder, isEnter) =>
-            _handleGeofenceEvent(reminder, isEnter, settings),
+        onGeofenceEvent: (reminder, isEnter, edgeDistance) =>
+            _handleGeofenceEvent(reminder, isEnter, edgeDistance, settings),
+        onApproachingEvent: (reminder, edgeDistance) =>
+            _handleApproachingEvent(reminder, edgeDistance, settings),
       );
       if (mounted && started != _monitoringActive) {
         setState(() => _monitoringActive = started);
@@ -65,9 +67,29 @@ class _GeofenceBinderState extends State<GeofenceBinder> {
     }
   }
 
+  void _handleApproachingEvent(
+    Reminder reminder,
+    double edgeDistanceMeters,
+    SettingsProvider settings,
+  ) {
+    if (!settings.notificationsEnabled) return;
+    if (settings.isWithinQuietHours()) {
+      final isHighPriority = reminder.priority == ReminderPriority.high;
+      if (!settings.allowHighPriorityDuringQuietHours || !isHighPriority) return;
+    }
+
+    NotificationService.instance.showApproachingNotification(
+      reminder: reminder,
+      edgeDistanceMeters: edgeDistanceMeters,
+      withSound: settings.soundEnabled,
+      withVibration: settings.vibrationEnabled,
+    );
+  }
+
   void _handleGeofenceEvent(
     Reminder reminder,
     bool isEnter,
+    double edgeDistanceMeters,
     SettingsProvider settings,
   ) {
     if (!settings.notificationsEnabled) return;
@@ -75,10 +97,12 @@ class _GeofenceBinderState extends State<GeofenceBinder> {
     // Buffer the event instead of showing it immediately. All events
     // produced by the same location update arrive synchronously (the
     // location service loops over reminders in one pass), so a very short
-    // timer is enough to catch the whole batch before flushing — this is
-    // what makes bundling possible without changing the location service's
-    // per-reminder callback signature.
-    _pendingEvents.add((reminder: reminder, isEnter: isEnter));
+    // timer is enough to catch the whole batch before flushing.
+    _pendingEvents.add((
+      reminder: reminder,
+      isEnter: isEnter,
+      edgeDistanceMeters: edgeDistanceMeters,
+    ));
     _flushTimer?.cancel();
     _flushTimer = Timer(
       const Duration(milliseconds: 300),
@@ -88,7 +112,7 @@ class _GeofenceBinderState extends State<GeofenceBinder> {
 
   void _flushPendingEvents(SettingsProvider settings) {
     if (_pendingEvents.isEmpty) return;
-    final events = List<({Reminder reminder, bool isEnter})>.from(_pendingEvents);
+    final events = List<({Reminder reminder, bool isEnter, double? edgeDistanceMeters})>.from(_pendingEvents);
     _pendingEvents.clear();
 
     final isQuiet = settings.isWithinQuietHours();
@@ -113,9 +137,7 @@ class _GeofenceBinderState extends State<GeofenceBinder> {
     if (toShow.isEmpty) return;
 
     // Feature 13 — Intelligent Notification Ranking: when several
-    // reminders trigger together (e.g. arriving somewhere with 5 pending
-    // reminders), show the most urgent ones first instead of database/
-    // insertion order.
+    // reminders trigger together, show the most urgent ones first.
     final rankedReminders = IntelligenceService.instance
         .rankForNotification(toShow.map((e) => e.reminder).toList());
     toShow.sort((a, b) =>
@@ -132,6 +154,7 @@ class _GeofenceBinderState extends State<GeofenceBinder> {
         NotificationService.instance.showGeofenceNotification(
           reminder: event.reminder,
           isEnter: event.isEnter,
+          edgeDistanceMeters: event.edgeDistanceMeters,
           withSound: settings.soundEnabled,
           withVibration: settings.vibrationEnabled,
         );

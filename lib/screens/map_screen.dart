@@ -15,11 +15,13 @@ class PickedLocation {
   final double latitude;
   final double longitude;
   final String address;
+  final double? radius;
 
   const PickedLocation({
     required this.latitude,
     required this.longitude,
     required this.address,
+    this.radius,
   });
 }
 
@@ -48,8 +50,14 @@ class MapScreen extends StatefulWidget {
   /// Optional starting point, e.g. when editing an existing reminder.
   final double? initialLatitude;
   final double? initialLongitude;
+  final double? initialRadius;
 
-  const MapScreen({super.key, this.initialLatitude, this.initialLongitude});
+  const MapScreen({
+    super.key,
+    this.initialLatitude,
+    this.initialLongitude,
+    this.initialRadius,
+  });
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -64,6 +72,7 @@ class _MapScreenState extends State<MapScreen> {
 
   ll.LatLng _selectedPosition = _fallback;
   String _address = 'Move the map or tap to pick a location';
+  double _radius = 200.0;
   bool _isLocating = false;
   bool _isResolvingAddress = false;
 
@@ -74,6 +83,7 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
+    _radius = widget.initialRadius ?? 200.0;
     if (widget.initialLatitude != null && widget.initialLongitude != null) {
       _selectedPosition = ll.LatLng(widget.initialLatitude!, widget.initialLongitude!);
       _resolveAddress(_selectedPosition);
@@ -262,6 +272,24 @@ class _MapScreenState extends State<MapScreen> {
     _searchFocusNode.unfocus();
   }
 
+  String _formatPerimeterDistance(double r) {
+    final circumference = 2 * 3.141592653589793 * r;
+    if (circumference < 1000) {
+      return '${circumference.toInt()} m';
+    } else {
+      return '${(circumference / 1000).toStringAsFixed(2)} km';
+    }
+  }
+
+  String _formatCoverageArea(double r) {
+    final areaSqM = 3.141592653589793 * r * r;
+    if (areaSqM < 1000000) {
+      return '${areaSqM.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} m²';
+    } else {
+      return '${(areaSqM / 1000000).toStringAsFixed(2)} km²';
+    }
+  }
+
   void _confirmSelection() {
     Navigator.pop(
       context,
@@ -269,15 +297,20 @@ class _MapScreenState extends State<MapScreen> {
         latitude: _selectedPosition.latitude,
         longitude: _selectedPosition.longitude,
         address: _address,
+        radius: _radius,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final perimeterDistance = _formatPerimeterDistance(_radius);
+    final coverageArea = _formatCoverageArea(_radius);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Select Location'),
+        title: const Text('Select Location & Perimeter'),
       ),
       body: Stack(
         alignment: Alignment.center,
@@ -293,12 +326,26 @@ class _MapScreenState extends State<MapScreen> {
             ),
             children: [
               TileLayer(
-                urlTemplate:
-                'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                urlTemplate: isDark
+                    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+                    : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
                 subdomains: const ['a', 'b', 'c', 'd'],
                 userAgentPackageName: 'com.smartspot.app',
                 maxZoom: 20,
                 retinaMode: true, // serves sharp @2x tiles on high-density screens
+              ),
+              // Dynamic Covered Circle Shape around Pinpoint
+              CircleLayer(
+                circles: [
+                  CircleMarker(
+                    point: _selectedPosition,
+                    radius: _radius,
+                    useRadiusInMeter: true,
+                    color: AppColors.primary.withValues(alpha: isDark ? 0.25 : 0.18),
+                    borderColor: AppColors.primary,
+                    borderStrokeWidth: 2.5,
+                  ),
+                ],
               ),
             ],
           ),
@@ -341,7 +388,7 @@ class _MapScreenState extends State<MapScreen> {
                       )
                           : null),
                       filled: true,
-                      fillColor: Colors.white,
+                      fillColor: isDark ? const Color(0xFF1E2430) : Colors.white,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20),
                         borderSide: BorderSide.none,
@@ -360,9 +407,9 @@ class _MapScreenState extends State<MapScreen> {
                 if (_searchResults.isNotEmpty)
                   Container(
                     margin: const EdgeInsets.only(top: 6),
-                    constraints: const BoxConstraints(maxHeight: 260),
+                    constraints: const BoxConstraints(maxHeight: 240),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: isDark ? const Color(0xFF1E2430) : Colors.white,
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: const [
                         BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 3)),
@@ -394,11 +441,11 @@ class _MapScreenState extends State<MapScreen> {
 
           Positioned(
             right: 16,
-            bottom: 160,
+            bottom: 220,
             child: FloatingActionButton(
               heroTag: 'current_location_fab',
               mini: true,
-              backgroundColor: Colors.white,
+              backgroundColor: isDark ? const Color(0xFF1E2430) : Colors.white,
               foregroundColor: AppColors.primary,
               onPressed: _isLocating ? null : _useCurrentLocation,
               child: _isLocating
@@ -410,22 +457,26 @@ class _MapScreenState extends State<MapScreen> {
                   : const Icon(Icons.my_location),
             ),
           ),
+
+          // Bottom card with address, perimeter covered distance metrics, and radius slider
           Positioned(
             left: 16,
             right: 16,
             bottom: 16,
             child: Card(
-              elevation: 4,
+              elevation: 6,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              color: isDark ? const Color(0xFF161A23) : Colors.white,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Address Row
                     Row(
                       children: [
-                        const Icon(Icons.place_rounded, size: 18, color: AppColors.primary),
+                        const Icon(Icons.place_rounded, size: 20, color: AppColors.primary),
                         const SizedBox(width: 8),
                         Expanded(
                           child: _isResolvingAddress
@@ -434,15 +485,85 @@ class _MapScreenState extends State<MapScreen> {
                             _address,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.w500),
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
+
+                    // Perimeter Covered Distance & Metrics Bar
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: isDark ? 0.15 : 0.08),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _perimeterMetricColumn(
+                            'Radius',
+                            '${_radius.toInt()} m',
+                            Icons.radar_rounded,
+                          ),
+                          Container(width: 1, height: 26, color: AppColors.primary.withValues(alpha: 0.3)),
+                          _perimeterMetricColumn(
+                            'Perimeter Distance',
+                            perimeterDistance,
+                            Icons.all_inclusive_rounded,
+                          ),
+                          Container(width: 1, height: 26, color: AppColors.primary.withValues(alpha: 0.3)),
+                          _perimeterMetricColumn(
+                            'Covered Area',
+                            coverageArea,
+                            Icons.circle_outlined,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Interactive Perimeter Radius Slider
+                    Row(
+                      children: [
+                        const Text(
+                          'Radius:',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                        Expanded(
+                          child: SliderTheme(
+                            data: SliderTheme.of(context).copyWith(
+                              activeTrackColor: AppColors.primary,
+                              thumbColor: AppColors.primary,
+                              overlayColor: AppColors.primary.withValues(alpha: 0.15),
+                              trackHeight: 3.5,
+                            ),
+                            child: Slider(
+                              value: _radius,
+                              min: 50,
+                              max: 2000,
+                              divisions: 39,
+                              label: '${_radius.toInt()} m',
+                              onChanged: (val) => setState(() => _radius = val),
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '${_radius.toInt()}m',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Confirm Button
                     SizedBox(
                       width: double.infinity,
-                      height: 48,
+                      height: 46,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           gradient: AppColors.primaryGradient,
@@ -455,11 +576,12 @@ class _MapScreenState extends State<MapScreen> {
                             onTap: _confirmSelection,
                             child: const Center(
                               child: Text(
-                                'Confirm Location',
+                                'Confirm Location & Perimeter',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 0.3,
+                                  fontSize: 14,
                                 ),
                               ),
                             ),
@@ -474,6 +596,38 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _perimeterMetricColumn(String label, String value, IconData icon) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: AppColors.primary),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w800,
+            color: AppColors.primary,
+          ),
+        ),
+      ],
     );
   }
 }

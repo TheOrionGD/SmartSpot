@@ -2,7 +2,7 @@ name: smartspot
 description: "SmartSpot - Location-Based Reminder App (Phase 1)"
 publish_to: 'none'
 
-version: 1.5.0+3
+version: 1.6.0+4
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -44,3 +44,5 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/audio/vibration_sound.mp3

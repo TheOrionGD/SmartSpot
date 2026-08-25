@@ -19,7 +19,17 @@ class NotificationService {
   static const String _geofenceChannelId = 'smartspot_geofence_channel';
   static const String _geofenceChannelName = 'Location Reminders';
   static const String _geofenceChannelDescription =
-      'Alerts you when you enter or leave a reminder location';
+      'Alerts you when you enter, leave, or approach a reminder location';
+
+  static String formatDistance(double? distanceMeters) {
+    if (distanceMeters == null) return '--';
+    if (distanceMeters < 1000) {
+      return '${distanceMeters.toInt()}m';
+    } else {
+      final km = distanceMeters / 1000.0;
+      return '${km.toStringAsFixed(1)}km';
+    }
+  }
 
   Future<void> init() async {
     if (_initialized) return;
@@ -44,13 +54,17 @@ class NotificationService {
       await _plugin.initialize(initSettings);
 
       if (defaultTargetPlatform == TargetPlatform.android) {
-        const channel = AndroidNotificationChannel(
+        const customSound = RawResourceAndroidNotificationSound('vibration_sound');
+        final channel = AndroidNotificationChannel(
           _geofenceChannelId,
           _geofenceChannelName,
           description: _geofenceChannelDescription,
           importance: Importance.high,
           playSound: true,
+          sound: customSound,
           enableVibration: true,
+          vibrationPattern: Int64List.fromList([0, 500, 200, 500]),
+          audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
         );
         await _plugin
             .resolvePlatformSpecificImplementation<
@@ -68,6 +82,7 @@ class NotificationService {
   Future<void> showGeofenceNotification({
     required Reminder reminder,
     required bool isEnter,
+    double? edgeDistanceMeters,
     bool withSound = true,
     bool withVibration = true,
   }) async {
@@ -76,8 +91,12 @@ class NotificationService {
     // Trigger physical device tactile vibration feedback on enter and leave alerts
     if (withVibration) {
       try {
-        HapticFeedback.heavyImpact();
-        HapticFeedback.vibrate();
+        if (isEnter) {
+          HapticFeedback.heavyImpact();
+        } else {
+          HapticFeedback.heavyImpact();
+          Future.delayed(const Duration(milliseconds: 200), () => HapticFeedback.heavyImpact());
+        }
       } catch (_) {}
     }
 
@@ -86,13 +105,25 @@ class NotificationService {
         ? reminder.locationName!
         : '(${reminder.latitude.toStringAsFixed(4)}, ${reminder.longitude.toStringAsFixed(4)})';
 
-    final title = isEnter
-        ? "📍 Inside Perimeter • ${reminder.title}"
-        : "⚠️ Left Perimeter • ${reminder.title}";
+    final formattedEdge = edgeDistanceMeters != null
+        ? formatDistance(edgeDistanceMeters)
+        : null;
 
-    final body = isEnter
-        ? "Reminder: ${reminder.title}\nCategory: [$categoryName] ${reminder.categoryEmoji}\nLocation: $place\nYou are inside the perimeter"
-        : "Reminder: ${reminder.title}\nCategory: [$categoryName] ${reminder.categoryEmoji}\nLocation: $place\nYOU ARE OUTSIDE THE PERIMETER";
+    final String tag;
+    if (isEnter) {
+      tag = 'Inside perimeter! Spot trigger active.';
+    } else if (formattedEdge != null && formattedEdge != '--') {
+      tag = 'Outside perimeter ($formattedEdge to perimeter edge)';
+    } else {
+      tag = 'YOU ARE OUTSIDE THE PERIMETER';
+    }
+
+    final title = isEnter
+        ? '📍 Inside Perimeter • ${reminder.title}'
+        : '⚠️ Left Perimeter • ${reminder.title}';
+
+    final body =
+        'Reminder: ${reminder.title}\nCategory: [$categoryName] ${reminder.categoryEmoji}\nLocation: $place\nTag: $tag';
 
     if (kIsWeb) {
       WebNotificationHelper.show(title, body);
@@ -105,14 +136,39 @@ class NotificationService {
       channelDescription: _geofenceChannelDescription,
       importance: Importance.high,
       priority: Priority.high,
+      category: AndroidNotificationCategory.reminder,
+      audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+      visibility: NotificationVisibility.public,
       playSound: withSound,
+      sound: withSound ? const RawResourceAndroidNotificationSound('vibration_sound') : null,
       enableVibration: withVibration,
-      vibrationPattern: Int64List.fromList([0, 500, 250, 500]),
+      vibrationPattern: isEnter
+          ? Int64List.fromList([0, 500, 200, 500])
+          : Int64List.fromList([0, 600, 200, 600, 200, 600]),
       styleInformation: BigTextStyleInformation(
         body,
         contentTitle: title,
         summaryText: isEnter ? 'Inside Perimeter' : 'Outside Perimeter',
       ),
+      actions: const <AndroidNotificationAction>[
+        AndroidNotificationAction(
+          'action_silence',
+          'Silence 🔕',
+          showsUserInterface: false,
+          cancelNotification: false,
+        ),
+        AndroidNotificationAction(
+          'action_open_map',
+          'Open Map 🗺️',
+          showsUserInterface: true,
+        ),
+        AndroidNotificationAction(
+          'action_done',
+          'Mark Done ✅',
+          showsUserInterface: false,
+          cancelNotification: true,
+        ),
+      ],
       color: isEnter ? const Color(0xFF10B981) : const Color(0xFFFF5252),
     );
 
@@ -120,7 +176,9 @@ class NotificationService {
       presentAlert: true,
       presentBadge: true,
       presentSound: withSound,
-      subtitle: isEnter ? 'Inside perimeter' : 'YOU ARE OUTSIDE THE PERIMETER',
+      sound: withSound ? 'vibration_sound.mp3' : null,
+      subtitle: tag,
+      categoryIdentifier: 'geofence_actions',
     );
 
     // Use enter/exit + reminder id to produce a stable, unique notification
@@ -137,14 +195,95 @@ class NotificationService {
     );
   }
 
+  /// Shows an approaching perimeter alert when the user nears the geofence perimeter.
+  Future<void> showApproachingNotification({
+    required Reminder reminder,
+    required double edgeDistanceMeters,
+    bool withSound = true,
+    bool withVibration = true,
+  }) async {
+    if (!_initialized) await init();
+
+    if (withVibration) {
+      try {
+        HapticFeedback.mediumImpact();
+      } catch (_) {}
+    }
+
+    final categoryName = reminder.category.name.toUpperCase();
+    final place = (reminder.locationName != null && reminder.locationName!.trim().isNotEmpty)
+        ? reminder.locationName!
+        : '(${reminder.latitude.toStringAsFixed(4)}, ${reminder.longitude.toStringAsFixed(4)})';
+
+    final formattedEdge = formatDistance(edgeDistanceMeters);
+    final tag = 'Approaching spot ($formattedEdge to perimeter)';
+    final title = '🎯 Approaching Perimeter • ${reminder.title}';
+    final body =
+        'Reminder: ${reminder.title}\nCategory: [$categoryName] ${reminder.categoryEmoji}\nLocation: $place\nTag: $tag';
+
+    if (kIsWeb) {
+      WebNotificationHelper.show(title, body);
+      return;
+    }
+
+    final androidDetails = AndroidNotificationDetails(
+      _geofenceChannelId,
+      _geofenceChannelName,
+      channelDescription: _geofenceChannelDescription,
+      importance: Importance.high,
+      priority: Priority.high,
+      category: AndroidNotificationCategory.reminder,
+      audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+      visibility: NotificationVisibility.public,
+      playSound: withSound,
+      sound: withSound ? const RawResourceAndroidNotificationSound('vibration_sound') : null,
+      enableVibration: withVibration,
+      vibrationPattern: Int64List.fromList([0, 300, 150, 300]),
+      styleInformation: BigTextStyleInformation(
+        body,
+        contentTitle: title,
+        summaryText: tag,
+      ),
+      actions: const <AndroidNotificationAction>[
+        AndroidNotificationAction(
+          'action_silence',
+          'Silence 🔕',
+          showsUserInterface: false,
+          cancelNotification: false,
+        ),
+        AndroidNotificationAction(
+          'action_open_map',
+          'Open Map 🗺️',
+          showsUserInterface: true,
+        ),
+      ],
+      color: const Color(0xFFF59E0B),
+    );
+
+    final iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: withSound,
+      sound: withSound ? 'vibration_sound.mp3' : null,
+      subtitle: tag,
+      categoryIdentifier: 'geofence_actions',
+    );
+
+    final notificationId = (reminder.id.hashCode & 0x7fffffff) ^ 2;
+
+    await _plugin.show(
+      notificationId,
+      title,
+      body,
+      NotificationDetails(android: androidDetails, iOS: iosDetails),
+      payload: reminder.id,
+    );
+  }
+
   /// Shows a single grouped notification summarizing multiple geofence
-  /// events that fired close together (e.g. several reminders near the
-  /// same place, or several unrelated reminders that happened to trigger
-  /// on the same location update) instead of showing one notification per
-  /// reminder. Falls back gracefully — callers should only invoke this with
-  /// 2+ events; with exactly 1 event, prefer [showGeofenceNotification].
+  /// events that fired close together.
   Future<void> showBundledGeofenceNotification({
-    required List<({Reminder reminder, bool isEnter})> events,
+    required List<({Reminder reminder, bool isEnter, double? edgeDistanceMeters})> events,
     bool withSound = true,
     bool withVibration = true,
   }) async {
@@ -160,6 +299,7 @@ class NotificationService {
       return showGeofenceNotification(
         reminder: only.reminder,
         isEnter: only.isEnter,
+        edgeDistanceMeters: only.edgeDistanceMeters,
         withSound: withSound,
         withVibration: withVibration,
       );
@@ -178,10 +318,16 @@ class NotificationService {
       final loc = (e.reminder.locationName != null && e.reminder.locationName!.trim().isNotEmpty)
           ? e.reminder.locationName!
           : '(${e.reminder.latitude.toStringAsFixed(4)}, ${e.reminder.longitude.toStringAsFixed(4)})';
+      final formattedEdge = e.edgeDistanceMeters != null
+          ? formatDistance(e.edgeDistanceMeters)
+          : null;
       if (e.isEnter) {
-        return '📍 ${e.reminder.title} • [$cat] • $loc (Inside perimeter)';
+        return '📍 ${e.reminder.title} • [$cat] • $loc (Inside perimeter! Spot trigger active)';
       } else {
-        return '👋 ${e.reminder.title} • [$cat] • $loc — YOU ARE OUTSIDE THE PERIMETER';
+        final edgeInfo = (formattedEdge != null && formattedEdge != '--')
+            ? 'Outside perimeter ($formattedEdge to perimeter edge)'
+            : 'OUTSIDE THE PERIMETER';
+        return '⚠️ ${e.reminder.title} • [$cat] • $loc — $edgeInfo';
       }
     }).toList();
 
@@ -196,7 +342,11 @@ class NotificationService {
       channelDescription: _geofenceChannelDescription,
       importance: Importance.high,
       priority: Priority.high,
+      category: AndroidNotificationCategory.reminder,
+      audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+      visibility: NotificationVisibility.public,
       playSound: withSound,
+      sound: withSound ? const RawResourceAndroidNotificationSound('vibration_sound') : null,
       enableVibration: withVibration,
       vibrationPattern: Int64List.fromList([0, 500, 250, 500]),
       styleInformation: InboxStyleInformation(
@@ -212,13 +362,11 @@ class NotificationService {
       presentAlert: true,
       presentBadge: true,
       presentSound: withSound,
+      sound: withSound ? 'vibration_sound.mp3' : null,
       subtitle: summary,
       threadIdentifier: 'smartspot_geofence_group',
     );
 
-    // A fixed id (distinct from any single-reminder id, which is derived
-    // from reminder.id.hashCode) so repeated bundles replace each other
-    // instead of stacking, and never collide with a single-event id.
     const bundledNotificationId = 0x7ffffffe;
 
     await _plugin.show(
@@ -229,5 +377,64 @@ class NotificationService {
     );
   }
 
+  static const String _liveMonitorChannelId = 'smartspot_live_guidance_channel';
+  static const String _liveMonitorChannelName = 'Live Perimeter Navigation';
+  static const String _liveMonitorChannelDescription =
+      'Shows live distance to nearby perimeter locations like Google Maps';
+  static const int liveMonitorNotificationId = 0x7ffffffd;
+
+  /// Google Maps-style live persistent perimeter guidance notification
+  Future<void> updateLivePerimeterGuidanceNotification({
+    required String activeSpotTitle,
+    required String statusTag,
+    required double edgeDistanceMeters,
+    required int totalActiveSpots,
+  }) async {
+    if (!_initialized) await init();
+    if (kIsWeb) return;
+
+    final formattedDist = formatDistance(edgeDistanceMeters);
+    final title = '📍 SmartSpot Live • $activeSpotTitle';
+    final body = '$statusTag ($formattedDist) • $totalActiveSpots perimeter${totalActiveSpots > 1 ? 's' : ''} monitored';
+
+    final androidDetails = AndroidNotificationDetails(
+      _liveMonitorChannelId,
+      _liveMonitorChannelName,
+      channelDescription: _liveMonitorChannelDescription,
+      importance: Importance.low,
+      priority: Priority.low,
+      ongoing: true,
+      autoCancel: false,
+      showWhen: true,
+      onlyAlertOnce: true,
+      actions: const <AndroidNotificationAction>[
+        AndroidNotificationAction(
+          'action_open_app',
+          'Open SmartSpot 📱',
+          showsUserInterface: true,
+        ),
+      ],
+      color: const Color(0xFF5B5FEF),
+    );
+
+    final iosDetails = const DarwinNotificationDetails(
+      presentAlert: false,
+      presentBadge: false,
+      presentSound: false,
+    );
+
+    await _plugin.show(
+      liveMonitorNotificationId,
+      title,
+      body,
+      NotificationDetails(android: androidDetails, iOS: iosDetails),
+    );
+  }
+
+  Future<void> cancelLiveGuidanceNotification() =>
+      _plugin.cancel(liveMonitorNotificationId);
+
   Future<void> cancelAll() => _plugin.cancelAll();
 }
+
+

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' as ll;
@@ -29,6 +30,8 @@ class LiveLocationProvider extends ChangeNotifier {
   ll.LatLng? get currentLatLng => _currentPosition != null
       ? ll.LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
       : null;
+
+  Timer? _pollingTimer;
 
   LiveLocationProvider() {
     initLocationStream();
@@ -67,11 +70,27 @@ class LiveLocationProvider extends ChangeNotifier {
         notifyListeners();
       }
 
-      // Subscribe to real-time location updates
-      const locationSettings = LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 5, // Update on 5m movement
-      );
+      // High-frequency real-time location stream settings tuned per-platform
+      late final LocationSettings locationSettings;
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        locationSettings = AndroidSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 0,
+          intervalDuration: const Duration(seconds: 1),
+        );
+      } else if (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.macOS) {
+        locationSettings = AppleSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 0,
+          pauseLocationUpdatesAutomatically: false,
+          showBackgroundLocationIndicator: true,
+        );
+      } else {
+        locationSettings = const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 0,
+        );
+      }
 
       _positionSubscription?.cancel();
       _positionSubscription = Geolocator.getPositionStream(
@@ -89,11 +108,48 @@ class LiveLocationProvider extends ChangeNotifier {
           notifyListeners();
         },
       );
+
+      // Active 1-second periodic fallback to ensure real-time updates within seconds
+      _pollingTimer?.cancel();
+      _pollingTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
+        try {
+          final pos = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              timeLimit: Duration(seconds: 2),
+            ),
+          );
+          if (_currentPosition == null ||
+              _currentPosition!.latitude != pos.latitude ||
+              _currentPosition!.longitude != pos.longitude) {
+            _currentPosition = pos;
+            _isLoading = false;
+            _errorMessage = null;
+            notifyListeners();
+          }
+        } catch (_) {}
+      });
     } catch (e) {
       _errorMessage = 'Location Service Error';
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  /// Manually force an immediate fresh GPS location fix
+  Future<void> refreshLocation() async {
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 3),
+        ),
+      );
+      _currentPosition = pos;
+      _isLoading = false;
+      _errorMessage = null;
+      notifyListeners();
+    } catch (_) {}
   }
 
   /// Calculates exact geographic distance in meters to target coordinates.
@@ -150,6 +206,7 @@ class LiveLocationProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _pollingTimer?.cancel();
     _positionSubscription?.cancel();
     super.dispose();
   }
