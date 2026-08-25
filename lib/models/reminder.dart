@@ -8,6 +8,22 @@ enum ReminderCategory {
   college,
   health,
   travel,
+  gym,
+  restaurant,
+  bank,
+  fuel,
+  hospital,
+  entertainment,
+  pet,
+  park,
+  laundry,
+  repair,
+  beauty,
+  library,
+  stationery,
+  temple,
+  airport,
+  coffee,
 }
 
 enum ReminderPriority {
@@ -249,6 +265,38 @@ class Reminder {
         return '💊';
       case ReminderCategory.travel:
         return '🚗';
+      case ReminderCategory.gym:
+        return '🏋️';
+      case ReminderCategory.restaurant:
+        return '🍽️';
+      case ReminderCategory.bank:
+        return '🏦';
+      case ReminderCategory.fuel:
+        return '⛽';
+      case ReminderCategory.hospital:
+        return '🏥';
+      case ReminderCategory.entertainment:
+        return '🎬';
+      case ReminderCategory.pet:
+        return '🐶';
+      case ReminderCategory.park:
+        return '🌳';
+      case ReminderCategory.laundry:
+        return '🧺';
+      case ReminderCategory.repair:
+        return '🔧';
+      case ReminderCategory.beauty:
+        return '💇';
+      case ReminderCategory.library:
+        return '📚';
+      case ReminderCategory.stationery:
+        return '✏️';
+      case ReminderCategory.temple:
+        return '🛕';
+      case ReminderCategory.airport:
+        return '✈️';
+      case ReminderCategory.coffee:
+        return '☕';
     }
   }
 

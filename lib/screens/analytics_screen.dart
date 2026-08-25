@@ -19,10 +19,26 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   static const _categoryColors = {
     ReminderCategory.shopping: AppColors.info,
     ReminderCategory.home: AppColors.success,
-    ReminderCategory.office: AppColors.info,
+    ReminderCategory.office: AppColors.primary,
     ReminderCategory.college: Color(0xFFE8639B),
     ReminderCategory.health: AppColors.error,
     ReminderCategory.travel: Color(0xFF00B4D8),
+    ReminderCategory.gym: Color(0xFFFF6B6B),
+    ReminderCategory.restaurant: Color(0xFFFF9F43),
+    ReminderCategory.bank: Color(0xFF10AC84),
+    ReminderCategory.fuel: Color(0xFFFF9F1C),
+    ReminderCategory.hospital: Color(0xFFEE5253),
+    ReminderCategory.entertainment: Color(0xFF9B59B6),
+    ReminderCategory.pet: Color(0xFFE67E22),
+    ReminderCategory.park: Color(0xFF2ECC71),
+    ReminderCategory.laundry: Color(0xFF3498DB),
+    ReminderCategory.repair: Color(0xFF34495E),
+    ReminderCategory.beauty: Color(0xFFFD79A8),
+    ReminderCategory.library: Color(0xFF8E44AD),
+    ReminderCategory.stationery: Color(0xFFF1C40F),
+    ReminderCategory.temple: Color(0xFFE056FD),
+    ReminderCategory.airport: Color(0xFF00CEC9),
+    ReminderCategory.coffee: Color(0xFF6C5CE7),
   };
 
   @override
@@ -31,6 +47,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<ReminderProvider>();
       provider.loadReminders();
+      provider.loadCompleted();
       provider.loadStatistics();
       provider.loadArchived();
     });
@@ -49,13 +66,25 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       appBar: AppBar(title: Text(AppTranslations.tr(context, 'analytics'))),
       body: Consumer<ReminderProvider>(
         builder: (context, provider, child) {
-          final all = provider.allReminders;
-          final stats = provider.statistics;
-          final archivedCount = provider.archivedReminders.length;
+          // Combine ALL reminders across pending, completed, and archived for comprehensive analytics
+          final allPending = provider.allReminders;
+          final allCompleted = provider.completedReminders;
+          final allArchived = provider.archivedReminders;
 
-          final total = stats['total'] ?? all.length;
-          final completed = stats['completed'] ?? all.where((r) => r.isCompleted).length;
-          final pending = stats['pending'] ?? all.where((r) => !r.isCompleted && !r.isArchived).length;
+          final all = [
+            ...allPending,
+            ...allCompleted,
+            ...allArchived,
+          ];
+
+          final stats = provider.statistics;
+          final archivedCount = allArchived.length;
+          final completedCount = allCompleted.length + allPending.where((r) => r.isCompleted).length;
+          final pendingCount = allPending.where((r) => !r.isCompleted && !r.isArchived).length;
+          final totalCount = stats['total'] ?? (pendingCount + completedCount + archivedCount);
+          final total = totalCount > 0 ? totalCount : all.length;
+          final completed = completedCount;
+          final pending = pendingCount;
 
           // Category counts
           final Map<ReminderCategory, int> categoryCounts = {
@@ -126,6 +155,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           return RefreshIndicator(
             onRefresh: () async {
               await provider.loadReminders();
+              await provider.loadCompleted();
               await provider.loadStatistics();
               await provider.loadArchived();
             },

@@ -107,6 +107,15 @@ class LiveLocationProvider extends ChangeNotifier {
     );
   }
 
+  /// Calculates distance to the perimeter boundary edge in meters.
+  /// Returns 0.0 if user is inside the perimeter, otherwise returns distance to the edge.
+  double? calculateDistanceToPerimeterEdge(double targetLat, double targetLng, double radiusMeters) {
+    final distToCenter = calculateDistanceTo(targetLat, targetLng);
+    if (distToCenter == null) return null;
+    final distToEdge = distToCenter - radiusMeters;
+    return distToEdge < 0 ? 0.0 : distToEdge;
+  }
+
   /// Mathematically evaluates geofence status from real-time coordinates.
   GeofenceState evaluateGeofenceState(double targetLat, double targetLng, double radiusMeters) {
     final distance = calculateDistanceTo(targetLat, targetLng);

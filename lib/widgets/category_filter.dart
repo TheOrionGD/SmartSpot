@@ -9,20 +9,14 @@ class CategoryFilter extends StatelessWidget {
   const CategoryFilter({super.key});
 
   String _getCategoryEmoji(ReminderCategory category) {
-    switch (category) {
-      case ReminderCategory.shopping:
-        return '🛒';
-      case ReminderCategory.home:
-        return '🏠';
-      case ReminderCategory.office:
-        return '💼';
-      case ReminderCategory.college:
-        return '🎓';
-      case ReminderCategory.health:
-        return '💊';
-      case ReminderCategory.travel:
-        return '🚗';
-    }
+    return Reminder(
+      id: '',
+      title: '',
+      latitude: 0,
+      longitude: 0,
+      category: category,
+      createdAt: DateTime.now(),
+    ).categoryEmoji;
   }
 
   String _getCategoryName(ReminderCategory category) {

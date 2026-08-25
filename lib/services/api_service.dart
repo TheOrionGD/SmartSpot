@@ -23,6 +23,16 @@ class ApiService {
 
   String get _baseUrl => AuthService.baseUrl;
 
+  /// Fire-and-forget server warmup ping to compensate for backend cold boots during onboarding.
+  Future<void> pingBackend() async {
+    try {
+      final uri = Uri.parse('$_baseUrl/health');
+      await http.get(uri).timeout(const Duration(seconds: 15));
+    } catch (_) {
+      // Ignore errors; this is a background warmup request
+    }
+  }
+
   Future<dynamic> _send(
     String method,
     String path, {

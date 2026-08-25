@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:provider/provider.dart';
@@ -30,9 +31,9 @@ class LiveGeofencePreviewCard extends StatelessWidget {
       case GeofenceState.approaching:
         return AppColors.warning;
       case GeofenceState.outside:
-        return AppColors.primary;
-      case GeofenceState.locationUnavailable:
         return AppColors.error;
+      case GeofenceState.locationUnavailable:
+        return Colors.grey;
     }
   }
 
@@ -84,22 +85,31 @@ class LiveGeofencePreviewCard extends StatelessWidget {
     final destPos = ll.LatLng(reminder.latitude, reminder.longitude);
     final userPos = locationProvider.currentLatLng;
     final distanceMeters = locationProvider.calculateDistanceTo(reminder.latitude, reminder.longitude);
+    final edgeDistanceMeters = locationProvider.calculateDistanceToPerimeterEdge(reminder.latitude, reminder.longitude, reminder.radius);
     final geofenceState = locationProvider.evaluateGeofenceState(reminder.latitude, reminder.longitude, reminder.radius);
     final statusColor = _getStatusColor(geofenceState);
     final formattedDistance = locationProvider.formatDistance(distanceMeters);
+    final formattedEdgeDistance = locationProvider.formatDistance(edgeDistanceMeters);
+
+    // Provide haptic feedback when user is outside the perimeter
+    if (geofenceState == GeofenceState.outside && locationProvider.hasPermission) {
+      HapticFeedback.selectionClick();
+    }
 
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : Colors.grey[50],
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: statusColor.withValues(alpha: 0.3),
-          width: 1.5,
+          color: geofenceState == GeofenceState.outside
+              ? AppColors.error
+              : statusColor.withValues(alpha: 0.35),
+          width: geofenceState == GeofenceState.outside ? 2.0 : 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: statusColor.withValues(alpha: 0.1),
-            blurRadius: 12,
+            color: (geofenceState == GeofenceState.outside ? AppColors.error : statusColor).withValues(alpha: 0.25),
+            blurRadius: geofenceState == GeofenceState.outside ? 18 : 14,
             offset: const Offset(0, 4),
           ),
         ],
@@ -201,21 +211,29 @@ class LiveGeofencePreviewCard extends StatelessWidget {
           ClipRRect(
             borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18)),
             child: SizedBox(
-              height: 135,
+              height: 145,
               width: double.infinity,
               child: Stack(
                 children: [
                   FlutterMap(
                     options: MapOptions(
                       initialCenter: destPos,
-                      initialZoom: 14.2,
+                      initialZoom: 14.0,
+                      initialCameraFit: userPos != null
+                          ? CameraFit.bounds(
+                              bounds: LatLngBounds(destPos, userPos),
+                              padding: const EdgeInsets.all(36),
+                            )
+                          : null,
                       interactionOptions: const InteractionOptions(
                         flags: InteractiveFlag.none, // Gesture interactions handled on tap
                       ),
                     ),
                     children: [
                       TileLayer(
-                        urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                        urlTemplate: isDark
+                            ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+                            : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
                         subdomains: const ['a', 'b', 'c', 'd'],
                         userAgentPackageName: 'com.smartspot.app',
                         maxZoom: 19,
@@ -228,12 +246,24 @@ class LiveGeofencePreviewCard extends StatelessWidget {
                             point: destPos,
                             radius: reminder.radius,
                             useRadiusInMeter: true,
-                            color: AppColors.primary.withValues(alpha: 0.18),
-                            borderColor: AppColors.primary,
+                            color: statusColor.withValues(alpha: isDark ? 0.25 : 0.18),
+                            borderColor: statusColor,
                             borderStrokeWidth: 2,
                           ),
                         ],
                       ),
+
+                      // Connecting Line (Polyline) between User & Destination (Google Maps Style)
+                      if (userPos != null)
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: [userPos, destPos],
+                              strokeWidth: 2.5,
+                              color: statusColor,
+                            ),
+                          ],
+                        ),
 
                       // Map Markers: Destination Pin + Live User Marker
                       MarkerLayer(
@@ -241,8 +271,8 @@ class LiveGeofencePreviewCard extends StatelessWidget {
                           // Destination Marker Pin
                           Marker(
                             point: destPos,
-                            width: 32,
-                            height: 32,
+                            width: 36,
+                            height: 36,
                             child: Container(
                               decoration: BoxDecoration(
                                 color: AppColors.primary,
@@ -258,22 +288,22 @@ class LiveGeofencePreviewCard extends StatelessWidget {
                               child: const Icon(
                                 Icons.location_on_rounded,
                                 color: Colors.white,
-                                size: 18,
+                                size: 20,
                               ),
                             ),
                           ),
 
-                          // Live User Position Marker (if GPS available)
+                          // Live User Position Marker (if hardware GPS available)
                           if (userPos != null)
                             Marker(
                               point: userPos,
-                              width: 24,
-                              height: 24,
+                              width: 28,
+                              height: 28,
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: AppColors.sage,
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 2),
+                                  border: Border.all(color: Colors.white, width: 2.5),
                                   boxShadow: [
                                     BoxShadow(
                                       color: AppColors.sage.withValues(alpha: 0.5),
@@ -283,9 +313,9 @@ class LiveGeofencePreviewCard extends StatelessWidget {
                                 ),
                                 child: Center(
                                   child: Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: const BoxDecoration(
                                       color: Colors.white,
                                       shape: BoxShape.circle,
                                     ),
@@ -296,6 +326,67 @@ class LiveGeofencePreviewCard extends StatelessWidget {
                         ],
                       ),
                     ],
+                  ),
+
+                  // Top Status Sub-Banner
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF1E2430).withValues(alpha: 0.95)
+                            : Colors.white.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: geofenceState == GeofenceState.outside
+                              ? AppColors.error.withValues(alpha: 0.6)
+                              : statusColor.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            geofenceState == GeofenceState.inside
+                                ? Icons.check_circle_rounded
+                                : (geofenceState == GeofenceState.outside
+                                    ? Icons.warning_amber_rounded
+                                    : Icons.info_outline_rounded),
+                            size: 13,
+                            color: statusColor,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              geofenceState == GeofenceState.inside
+                                  ? 'Inside perimeter! Spot trigger active.'
+                                  : (geofenceState == GeofenceState.approaching
+                                      ? 'Approaching spot ($formattedEdgeDistance to perimeter)'
+                                      : 'Outside perimeter ($formattedEdgeDistance to perimeter edge)'),
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: geofenceState == GeofenceState.outside
+                                    ? (isDark ? const Color(0xFFFF6B6B) : AppColors.error)
+                                    : (isDark ? Colors.white : Colors.black87),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
 
                   // Overlay Tap Handler to Launch Full Live Map Screen
@@ -311,7 +402,7 @@ class LiveGeofencePreviewCard extends StatelessWidget {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                               decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.65),
+                                color: Colors.black.withValues(alpha: 0.7),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: const Row(

@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
 import 'app_theme.dart';
+import 'web_notification/web_notification.dart';
 
 /// Centralized helper for requesting runtime permissions with a friendly
 /// rationale shown *before* the system dialog, and a graceful path to the
@@ -70,8 +72,38 @@ class PermissionHelper {
   }
 
   /// Shows a rationale dialog, then requests notification permission
-  /// (relevant on Android 13+ and iOS). Returns true if granted.
+  /// (relevant on Android 13+, iOS, and Web browsers). Returns true if granted.
   static Future<bool> requestNotificationPermission(BuildContext context) async {
+    if (kIsWeb) {
+      final alreadyGranted = await WebNotificationHelper.hasPermission();
+      if (alreadyGranted) return true;
+
+      if (!context.mounted) return false;
+
+      final shouldProceed = await _showRationale(
+        context: context,
+        icon: Icons.notifications_active,
+        title: 'Enable Notifications',
+        message:
+            "SmartSpot uses browser notifications to alert you the moment you arrive "
+            "at or leave a reminder location.",
+      );
+      if (!shouldProceed || !context.mounted) return false;
+
+      final granted = await WebNotificationHelper.requestPermission();
+      if (!granted && context.mounted) {
+        _showOpenSettingsDialog(
+          context,
+          title: 'Notifications Blocked',
+          message:
+              "Notifications are currently blocked by your browser. Please click the icon "
+              "in your browser address bar (site settings) to allow notifications.",
+          onOpenSettings: () async {},
+        );
+      }
+      return granted;
+    }
+
     var status = await Permission.notification.status;
 
     if (status.isGranted) return true;
@@ -117,6 +149,8 @@ class PermissionHelper {
   /// monitoring only works while the app is open in the foreground.
   static Future<bool> requestBackgroundLocationPermission(
       BuildContext context) async {
+    if (kIsWeb) return true;
+
     final hasForeground = await hasLocationPermission();
     if (!hasForeground) return false;
 
@@ -158,6 +192,7 @@ class PermissionHelper {
 
   /// Checks (without prompting) whether background ("always") location is granted.
   static Future<bool> hasBackgroundLocationPermission() async {
+    if (kIsWeb) return true;
     final status = await Permission.locationAlways.status;
     return status.isGranted;
   }
@@ -171,6 +206,9 @@ class PermissionHelper {
 
   /// Checks (without prompting) whether notification access is currently granted.
   static Future<bool> hasNotificationPermission() async {
+    if (kIsWeb) {
+      return await WebNotificationHelper.hasPermission();
+    }
     final status = await Permission.notification.status;
     return status.isGranted;
   }

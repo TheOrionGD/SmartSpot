@@ -183,6 +183,8 @@ class _CheckmarkPainter extends CustomPainter {
 
 /// Celebratory micro-particle spark burst that radiates around the checkbox button
 /// when completing a reminder.
+/// Celebratory micro-particle spark & floating shield reward burst
+/// that animates floating golden/sage shield badges when completing a reminder.
 class CompletionRewardBurstWidget extends StatefulWidget {
   final Widget child;
   final bool trigger;
@@ -207,7 +209,7 @@ class _CompletionRewardBurstWidgetState extends State<CompletionRewardBurstWidge
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 450),
+      duration: const Duration(milliseconds: 750),
       vsync: this,
     )..addStatusListener((status) {
         if (status == AnimationStatus.completed) {
@@ -241,15 +243,70 @@ class _CompletionRewardBurstWidgetState extends State<CompletionRewardBurstWidge
       clipBehavior: Clip.none,
       children: [
         widget.child,
+
+        // Floating Shield Reward Celebration Overlay
         AnimatedBuilder(
           animation: _controller,
           builder: (context, _) {
             if (_controller.value == 0 || _controller.value == 1) {
               return const SizedBox.shrink();
             }
-            return CustomPaint(
-              size: const Size(60, 60),
-              painter: _RewardBurstPainter(progress: _controller.value),
+
+            final progress = _controller.value;
+            final opacity = (1.0 - progress).clamp(0.0, 1.0);
+            final floatDistance = -40.0 * progress;
+            final scale = (0.5 + (math.sin(progress * math.pi) * 0.7)).clamp(0.0, 1.2);
+
+            return Positioned(
+              top: floatDistance,
+              child: Opacity(
+                opacity: opacity,
+                child: Transform.scale(
+                  scale: scale,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFFD700), AppColors.sage],
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFFD700).withValues(alpha: 0.5),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.shield_rounded, color: Colors.white, size: 16),
+                            SizedBox(width: 4),
+                            Text(
+                              '+50 XP Shield Earned!',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      CustomPaint(
+                        size: const Size(90, 40),
+                        painter: _RewardBurstPainter(progress: progress),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             );
           },
         ),
@@ -264,24 +321,24 @@ class _RewardBurstPainter extends CustomPainter {
   _RewardBurstPainter({required this.progress});
 
   static const _particleColors = [
-    AppColors.primary,
+    Color(0xFFFFD700), // Gold
     AppColors.sage,
-    AppColors.primaryLight,
-    AppColors.periwinkle,
-    Color(0xFFFFB020),
+    AppColors.primary,
+    Color(0xFFFF9F43),
+    Color(0xFF00CEC9),
     Color(0xFFE8639B),
   ];
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final maxRadius = size.width * 0.75;
+    final maxRadius = size.width * 0.6;
     final radius = maxRadius * progress;
     final opacity = (1.0 - progress).clamp(0.0, 1.0);
 
     const count = 8;
     for (int i = 0; i < count; i++) {
-      final angle = (i * (2 * math.pi / count)) + (progress * 0.3);
+      final angle = (i * (2 * math.pi / count)) + (progress * 0.4);
       final px = center.dx + math.cos(angle) * radius;
       final py = center.dy + math.sin(angle) * radius;
 
@@ -290,7 +347,7 @@ class _RewardBurstPainter extends CustomPainter {
         ..color = color
         ..style = PaintingStyle.fill;
 
-      final dotRadius = (3.2 * (1.0 - progress)).clamp(1.0, 3.2);
+      final dotRadius = (4.0 * (1.0 - progress)).clamp(1.5, 4.0);
       canvas.drawCircle(Offset(px, py), dotRadius, paint);
     }
   }

@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'login_screen.dart';
 import '../utils/app_theme.dart';
 import '../utils/permission_helper.dart';
+import '../services/api_service.dart';
 
 class _OnboardPage {
   final IconData icon;
@@ -42,19 +43,43 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     ),
     _OnboardPage(
       icon: Icons.gps_fixed_rounded,
-      title: 'Location-Aware Reminders',
+      title: 'Location-Aware Geofencing',
       description:
           'SmartSpot uses GPS and geofencing to trigger reminders the moment '
           'you enter or leave a place you care about.',
       color: AppColors.info,
     ),
     _OnboardPage(
-      icon: Icons.notifications_active_rounded,
-      title: 'Never Forget Again',
+      icon: Icons.auto_awesome_rounded,
+      title: 'AI Intelligence Engine',
       description:
-          'Get notified for groceries, documents, assignments and more — '
-          'exactly when you\'re nearby, not at some random time.',
-      color: AppColors.success,
+          'SmartSpot predicts your next spots, adapts geofence radius to your movement speed, '
+          'and prioritizes urgent tasks dynamically.',
+      color: AppColors.sage,
+    ),
+    _OnboardPage(
+      icon: Icons.tune_rounded,
+      title: 'Multi-Condition Triggers',
+      description:
+          'Combine location with time of day, weather forecast, route direction, '
+          'and activity recognition for pinpoint accuracy.',
+      color: Color(0xFFFF9F43),
+    ),
+    _OnboardPage(
+      icon: Icons.cloud_sync_rounded,
+      title: 'Instant Cloud & Offline Sync',
+      description:
+          'Seamless background synchronization ensures your reminders are always ready '
+          'across all your devices even when offline.',
+      color: Color(0xFF00CEC9),
+    ),
+    _OnboardPage(
+      icon: Icons.groups_rounded,
+      title: 'Family & Group SmartSpots',
+      description:
+          'Share location spots with family members or team colleagues '
+          'so everyone stays on top of shared tasks.',
+      color: Color(0xFFE8639B),
     ),
     _OnboardPage(
       icon: Icons.verified_user_rounded,
@@ -70,6 +95,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void initState() {
     super.initState();
     _checkCurrentPermissions();
+    // Warm up backend server in background to compensate for cold boots
+    ApiService.instance.pingBackend();
   }
 
   Future<void> _checkCurrentPermissions() async {
@@ -159,13 +186,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 itemCount: _pages.length,
                 onPageChanged: (index) {
                   setState(() => _currentPage = index);
-                  if (index == 3) {
+                  if (index == _pages.length - 1) {
                     _checkCurrentPermissions();
                   }
                 },
                 itemBuilder: (context, index) {
                   final page = _pages[index];
-                  final isPermissionPage = index == 3;
+                  final isPermissionPage = index == _pages.length - 1;
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 28),

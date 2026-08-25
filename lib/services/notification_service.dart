@@ -1,14 +1,14 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart' show Color;
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../models/reminder.dart';
+import '../utils/web_notification/web_notification.dart';
 
 /// Wraps `flutter_local_notifications` behind a small, app-specific API.
 ///
 /// Actual permission requesting is handled by [PermissionHelper] elsewhere
-/// (via permission_handler) — this service assumes permission has already
-/// been granted by the time [showGeofenceNotification] is called, and simply
-/// won't display anything if it hasn't been.
+/// (via permission_handler or Web Notification API) — this service assumes permission has already
+/// been granted by the time [showGeofenceNotification] is called.
 class NotificationService {
   NotificationService._();
   static final NotificationService instance = NotificationService._();
@@ -73,11 +73,23 @@ class NotificationService {
   }) async {
     if (!_initialized) await init();
 
+    // Trigger physical device tactile vibration feedback on enter and leave alerts
+    if (withVibration) {
+      try {
+        HapticFeedback.vibrate();
+      } catch (_) {}
+    }
+
     final title = isEnter ? "📍 You've arrived" : '👋 Leaving the area';
     final place = reminder.locationName ?? 'your reminder location';
     final body = isEnter
         ? '${reminder.title} — you\'re near $place'
         : '${reminder.title} — you\'re leaving $place';
+
+    if (kIsWeb) {
+      WebNotificationHelper.show(title, body);
+      return;
+    }
 
     final androidDetails = AndroidNotificationDetails(
       _geofenceChannelId,
@@ -122,8 +134,12 @@ class NotificationService {
     bool withSound = true,
     bool withVibration = true,
   }) async {
-    if (!_initialized) await init();
-    if (events.isEmpty) return;
+    if (withVibration) {
+      try {
+        HapticFeedback.vibrate();
+      } catch (_) {}
+    }
+
     if (events.length == 1) {
       final only = events.first;
       return showGeofenceNotification(
@@ -141,6 +157,11 @@ class NotificationService {
     if (enterCount > 0) summaryParts.add('$enterCount arrival${enterCount == 1 ? '' : 's'}');
     if (exitCount > 0) summaryParts.add('$exitCount departure${exitCount == 1 ? '' : 's'}');
     final summary = summaryParts.join(' · ');
+
+    if (kIsWeb) {
+      WebNotificationHelper.show(title, summary);
+      return;
+    }
 
     final lines = events
         .map((e) => '${e.isEnter ? '📍' : '👋'} ${e.reminder.title}')
