@@ -204,6 +204,17 @@ class PermissionHelper {
         permission == LocationPermission.always;
   }
 
+  /// Requests all runtime permissions sequentially (Location, Background Location, Notifications).
+  static Future<void> requestAll(BuildContext context) async {
+    final hasLoc = await requestLocationPermission(context);
+    if (hasLoc && context.mounted && !kIsWeb) {
+      await requestBackgroundLocationPermission(context);
+    }
+    if (context.mounted) {
+      await requestNotificationPermission(context);
+    }
+  }
+
   /// Checks (without prompting) whether notification access is currently granted.
   static Future<bool> hasNotificationPermission() async {
     if (kIsWeb) {

@@ -104,7 +104,7 @@ class Reminder {
     this.isCompleted = false,
     this.isArchived = false,
     this.notifyOnEnter = true,
-    this.notifyOnExit = false,
+    this.notifyOnExit = true,
     this.routeAware = false,
     this.weatherAware = false,
     List<ReminderCondition>? conditions,

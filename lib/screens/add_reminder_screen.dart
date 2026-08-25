@@ -33,7 +33,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
   ReminderCategory category = ReminderCategory.shopping;
   ReminderPriority priority = ReminderPriority.medium;
   bool notifyOnEnter = true;
-  bool notifyOnExit = false;
+  bool notifyOnExit = true;
   bool routeAware = false;
   bool weatherAware = false;
   double radius = 200;

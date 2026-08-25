@@ -21,6 +21,8 @@ void main() {
       expect(reminder.priority, ReminderPriority.medium);
       expect(reminder.isCompleted, false);
       expect(reminder.isArchived, false);
+      expect(reminder.notifyOnEnter, true);
+      expect(reminder.notifyOnExit, true);
       expect(reminder.repeatType, ReminderRepeatType.once);
     });
 

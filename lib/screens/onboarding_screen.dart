@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'login_screen.dart';
@@ -29,9 +30,13 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _controller = PageController();
   int _currentPage = 0;
-  bool _hasLocation = false;
+  bool _hasForegroundLocation = false;
+  bool _hasBackgroundLocation = false;
   bool _hasNotification = false;
   bool _isRequestingPermissions = false;
+
+  bool get _allPermissionsGranted =>
+      _hasForegroundLocation && (kIsWeb || _hasBackgroundLocation) && _hasNotification;
 
   final List<_OnboardPage> _pages = const [
     _OnboardPage(
@@ -83,10 +88,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     ),
     _OnboardPage(
       icon: Icons.verified_user_rounded,
-      title: 'Location & Notification Access',
+      title: 'Permissions & Setup',
       description:
-          'To alert you the moment you arrive or leave a place, SmartSpot '
-          'needs location and notification permissions on your device.',
+          'SmartSpot requires location, background tracking, and notification permissions '
+          'to monitor perimeters and alert you with sound and vibration.',
       color: AppColors.periwinkle,
     ),
   ];
@@ -100,23 +105,46 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _checkCurrentPermissions() async {
-    final loc = await PermissionHelper.hasLocationPermission();
+    final fgLoc = await PermissionHelper.hasLocationPermission();
+    final bgLoc = await PermissionHelper.hasBackgroundLocationPermission();
     final notif = await PermissionHelper.hasNotificationPermission();
     if (mounted) {
       setState(() {
-        _hasLocation = loc;
+        _hasForegroundLocation = fgLoc;
+        _hasBackgroundLocation = bgLoc;
         _hasNotification = notif;
       });
     }
   }
 
-  Future<void> _requestLocationAccess() async {
+  Future<void> _requestAllPermissions() async {
     setState(() => _isRequestingPermissions = true);
     try {
-      final granted = await PermissionHelper.requestLocationPermission(context);
-      if (granted && mounted) {
-        await PermissionHelper.requestBackgroundLocationPermission(context);
+      await PermissionHelper.requestAll(context);
+    } finally {
+      await _checkCurrentPermissions();
+      if (mounted) setState(() => _isRequestingPermissions = false);
+    }
+  }
+
+  Future<void> _requestForegroundLocationAccess() async {
+    setState(() => _isRequestingPermissions = true);
+    try {
+      await PermissionHelper.requestLocationPermission(context);
+    } finally {
+      await _checkCurrentPermissions();
+      if (mounted) setState(() => _isRequestingPermissions = false);
+    }
+  }
+
+  Future<void> _requestBackgroundLocationAccess() async {
+    setState(() => _isRequestingPermissions = true);
+    try {
+      if (!_hasForegroundLocation) {
+        final granted = await PermissionHelper.requestLocationPermission(context);
+        if (!granted || !mounted) return;
       }
+      await PermissionHelper.requestBackgroundLocationPermission(context);
     } finally {
       await _checkCurrentPermissions();
       if (mounted) setState(() => _isRequestingPermissions = false);
@@ -134,13 +162,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _handleGetStarted() async {
-    if (!_hasLocation || !_hasNotification) {
-      if (!_hasLocation) {
-        await PermissionHelper.requestLocationPermission(context);
-      }
-      if (!_hasNotification && mounted) {
-        await PermissionHelper.requestNotificationPermission(context);
-      }
+    if (!_allPermissionsGranted) {
+      await _requestAllPermissions();
     }
     await _finish();
   }
@@ -195,20 +218,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   final isPermissionPage = index == _pages.length - 1;
 
                   return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Container(
-                          width: 140,
-                          height: 140,
+                          width: 110,
+                          height: 110,
                           decoration: BoxDecoration(
                             color: page.color.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(page.icon, size: 70, color: page.color),
+                          child: Icon(page.icon, size: 55, color: page.color),
                         ),
-                        const SizedBox(height: 28),
+                        const SizedBox(height: 20),
                         Text(
                           page.title,
                           textAlign: TextAlign.center,
@@ -216,32 +239,66 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 fontWeight: FontWeight.bold,
                               ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
                         Text(
                           page.description,
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 color: Colors.grey[600],
-                                height: 1.5,
+                                height: 1.4,
                               ),
                         ),
                         if (isPermissionPage) ...[
-                          const SizedBox(height: 28),
+                          const SizedBox(height: 20),
+                          if (!_allPermissionsGranted) ...[
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.primary,
+                                  side: const BorderSide(color: AppColors.primary, width: 1.5),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                ),
+                                icon: const Icon(Icons.security_rounded, size: 18),
+                                label: const Text(
+                                  'Grant All Permissions in One Tap',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                                onPressed: _isRequestingPermissions ? null : _requestAllPermissions,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
                           _permissionTile(
-                            title: 'Location Access',
-                            subtitle: _hasLocation
+                            title: 'Precise Location (GPS)',
+                            subtitle: _hasForegroundLocation
                                 ? 'Permission Granted'
-                                : 'Needed to trigger geofence alerts',
+                                : 'Detects when you arrive at or leave reminder spots',
                             icon: Icons.my_location_rounded,
-                            isGranted: _hasLocation,
-                            onTap: _isRequestingPermissions ? null : _requestLocationAccess,
+                            isGranted: _hasForegroundLocation,
+                            onTap: _isRequestingPermissions ? null : _requestForegroundLocationAccess,
                           ),
-                          const SizedBox(height: 12),
+                          if (!kIsWeb) ...[
+                            const SizedBox(height: 8),
+                            _permissionTile(
+                              title: 'Background Location',
+                              subtitle: _hasBackgroundLocation
+                                  ? 'Permission Granted'
+                                  : 'Enables 24/7 geofence perimeter alerts in background',
+                              icon: Icons.location_searching_rounded,
+                              isGranted: _hasBackgroundLocation,
+                              onTap: _isRequestingPermissions ? null : _requestBackgroundLocationAccess,
+                            ),
+                          ],
+                          const SizedBox(height: 8),
                           _permissionTile(
-                            title: 'Notification Access',
+                            title: 'Notifications & Vibration',
                             subtitle: _hasNotification
                                 ? 'Permission Granted'
-                                : 'Needed to show timely reminder alerts',
+                                : 'Delivers perimeter entry/exit pop-up alerts & vibration',
                             icon: Icons.notifications_active_rounded,
                             isGranted: _hasNotification,
                             onTap: _isRequestingPermissions ? null : _requestNotificationAccess,
