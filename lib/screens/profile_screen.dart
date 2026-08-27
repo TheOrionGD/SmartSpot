@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/reminder.dart';
 import '../providers/auth_provider.dart';
 import '../providers/reminder_provider.dart';
+import '../services/notification_service.dart';
 import '../utils/app_theme.dart';
 import 'settings_screen.dart';
 import 'login_screen.dart';
+import 'perimeter_alert_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -595,6 +598,38 @@ class ProfileScreen extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                          );
+                        },
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.vibration_rounded, color: AppColors.primary),
+                        title: const Text('Test Notification & Vibration'),
+                        subtitle: const Text('Trigger a test alarm with custom sound'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () {
+                          final dummyReminder = Reminder(
+                            id: 'test-reminder',
+                            title: 'Test Alarm Notification',
+                            description: 'This is a test of the reminder vibration and sound alert system.',
+                            latitude: 0.0,
+                            longitude: 0.0,
+                            locationName: 'Test Location',
+                            radius: 100,
+                            category: ReminderCategory.health,
+                            priority: ReminderPriority.high,
+                            createdAt: DateTime.now(),
+                            dueDate: DateTime.now(),
+                          );
+                          NotificationService.instance.showTimeDueNotification(
+                            reminder: dummyReminder,
+                            withSound: true,
+                            withVibration: true,
+                          );
+                          PerimeterAlertScreen.show(
+                            context,
+                            reminder: dummyReminder,
+                            alertType: AlertPerimeterType.timeDue,
                           );
                         },
                       ),

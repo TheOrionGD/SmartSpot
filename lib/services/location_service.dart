@@ -268,7 +268,7 @@ class GeofenceLocationService {
     if (reminders.isNotEmpty) {
       Reminder? closest;
       double minEdge = double.infinity;
-      String statusTag = 'Outside Perimeter';
+      String statusTag = 'Going Away From Perimeter';
 
       for (final r in reminders) {
         final dist = Geolocator.distanceBetween(
@@ -284,9 +284,9 @@ class GeofenceLocationService {
           if (dist <= r.radius) {
             statusTag = 'Inside Perimeter';
           } else if (dist <= r.radius * 1.5) {
-            statusTag = 'Approaching Spot';
+            statusTag = 'Going Towards Perimeter';
           } else {
-            statusTag = 'Outside Perimeter';
+            statusTag = 'Going Away From Perimeter';
           }
         }
       }

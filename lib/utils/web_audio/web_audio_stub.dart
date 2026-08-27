@@ -1,0 +1,2 @@
+void playWebAlarmSound() {}
+void stopWebAlarmSound() {}

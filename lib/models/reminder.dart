@@ -313,7 +313,7 @@ class Reminder {
 
   String get formattedDate {
     if (dueDate == null) return 'No due date';
-    return DateFormat('MMM dd, yyyy').format(dueDate!);
+    return DateFormat('MMM dd, yyyy • hh:mm a').format(dueDate!);
   }
 
   bool get isRecurring => repeatType != ReminderRepeatType.once;

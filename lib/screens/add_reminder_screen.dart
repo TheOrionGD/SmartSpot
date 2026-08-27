@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:provider/provider.dart';
@@ -217,7 +218,7 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
   }
 
   Future<void> _pickDueDate() async {
-    final picked = await showDatePicker(
+    final pickedDate = await showDatePicker(
       context: context,
       initialDate: dueDate ?? DateTime.now(),
       firstDate: DateTime.now().subtract(const Duration(days: 1)),
@@ -233,8 +234,46 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
         );
       },
     );
-    if (picked != null) {
-      setState(() => dueDate = picked);
+    if (pickedDate != null) {
+      if (!mounted) return;
+      final pickedTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay(
+          hour: dueDate?.hour ?? 9,
+          minute: dueDate?.minute ?? 0,
+        ),
+        builder: (context, child) {
+          return Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: Theme.of(context).colorScheme.copyWith(
+                    primary: AppColors.primary,
+                  ),
+            ),
+            child: child!,
+          );
+        },
+      );
+      if (pickedTime != null) {
+        setState(() {
+          dueDate = DateTime(
+            pickedDate.year,
+            pickedDate.month,
+            pickedDate.day,
+            pickedTime.hour,
+            pickedTime.minute,
+          );
+        });
+      } else {
+        setState(() {
+          dueDate = DateTime(
+            pickedDate.year,
+            pickedDate.month,
+            pickedDate.day,
+            0,
+            0,
+          );
+        });
+      }
     }
   }
 
@@ -563,30 +602,52 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
               _premiumCard(
                 isDark,
                 padding: EdgeInsets.zero,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(24),
-                  onTap: _pickDueDate,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    child: Row(
-                      children: [
-                        _goldIconBadge(Icons.calendar_today_rounded),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Text(
-                            dueDate == null
-                                ? 'No due date set'
-                                : '${dueDate!.day}/${dueDate!.month}/${dueDate!.year}',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark ? Colors.white : Colors.black87,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(24),
+                          bottomLeft: const Radius.circular(24),
+                          topRight: dueDate == null ? const Radius.circular(24) : Radius.zero,
+                          bottomRight: dueDate == null ? const Radius.circular(24) : Radius.zero,
+                        ),
+                        onTap: _pickDueDate,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          child: Row(
+                            children: [
+                              _goldIconBadge(Icons.calendar_today_rounded),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Text(
+                                  dueDate == null
+                                      ? 'No due date set'
+                                      : DateFormat('dd/MM/yyyy • hh:mm a').format(dueDate!),
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: isDark ? Colors.white : Colors.black87,
+                                      ),
                                 ),
+                              ),
+                              if (dueDate == null)
+                                Icon(Icons.chevron_right_rounded, color: Colors.grey[400]),
+                            ],
                           ),
                         ),
-                        Icon(Icons.chevron_right_rounded, color: Colors.grey[400]),
-                      ],
+                      ),
                     ),
-                  ),
+                    if (dueDate != null)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: IconButton(
+                          icon: Icon(Icons.close_rounded, color: Colors.grey[600]),
+                          onPressed: () {
+                            setState(() => dueDate = null);
+                          },
+                        ),
+                      ),
+                  ],
                 ),
               ),
 
@@ -662,12 +723,22 @@ class _AddReminderScreenState extends State<AddReminderScreen> {
                                 ),
                                 children: [
                                   TileLayer(
-                                    urlTemplate: isDark
-                                        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                                        : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                                    subdomains: const ['a', 'b', 'c', 'd'],
+                                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                                     userAgentPackageName: 'com.smartspot.app',
                                     maxZoom: 19,
+                                    tileBuilder: isDark
+                                        ? (context, tileWidget, tile) {
+                                            return ColorFiltered(
+                                              colorFilter: const ColorFilter.matrix(<double>[
+                                                -0.9, 0, 0, 0, 255,
+                                                0, -0.9, 0, 0, 255,
+                                                0, 0, -0.9, 0, 255,
+                                                0, 0, 0, 1, 0,
+                                              ]),
+                                              child: tileWidget,
+                                            );
+                                          }
+                                        : null,
                                   ),
                                   CircleLayer(
                                     circles: [

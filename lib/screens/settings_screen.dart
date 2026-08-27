@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../models/reminder.dart';
 import '../providers/reminder_provider.dart';
 import '../providers/settings_provider.dart';
+import '../services/notification_service.dart';
 import '../utils/permission_helper.dart';
 import '../utils/app_theme.dart';
 import '../utils/app_translations.dart';
@@ -18,6 +20,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool? _locationGranted;
   bool? _notificationGranted;
+  bool _testingNotification = false;
 
   @override
   void initState() {
@@ -332,6 +335,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (value) => settings.setReducedMotion(value),
           ),
           const Divider(),
+          _buildTestNotificationSection(context),
+          const Divider(),
           _sectionHeader('About'),
           const ListTile(
             leading: Icon(Icons.info_outline),
@@ -358,4 +363,180 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
+
+  // ── Test Phone Notifications & Vibration ─────────────────────────────────
+
+  Widget _buildTestNotificationSection(BuildContext context) {
+    final reminders = context.read<ReminderProvider>().allReminders;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader('Test Phone Notifications & Vibration'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Text(
+            'Tap any button below to fire a real phone notification with its vibration pattern. Useful to verify sound & vibration settings.',
+            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+          ),
+        ),
+        const SizedBox(height: 8),
+        _testTile(
+          icon: Icons.my_location_rounded,
+          iconColor: const Color(0xFF5B5FEF),
+          label: 'Active Watch',
+          subtitle: 'Type 1 — SmartSpot is watching your location',
+          onTap: () async {
+            final messenger = ScaffoldMessenger.of(context);
+            setState(() => _testingNotification = true);
+            try {
+              await NotificationService.instance
+                  .updateLivePerimeterGuidanceNotification(
+                activeSpotTitle: 'Demo Spot',
+                statusTag: 'Going Towards Perimeter',
+                edgeDistanceMeters: 142,
+                totalActiveSpots: reminders.isEmpty ? 1 : reminders.length,
+              );
+              messenger.showSnackBar(const SnackBar(
+                content: Text('📍 Active Watch notification sent!'),
+                duration: Duration(seconds: 2),
+              ));
+            } finally {
+              if (mounted) setState(() => _testingNotification = false);
+            }
+          },
+        ),
+        _testTile(
+          icon: Icons.radar_rounded,
+          iconColor: const Color(0xFFF59E0B),
+          label: 'Perimeter Alerts',
+          subtitle: 'Type 2 — Going Towards / Inside / Going Away From Perimeter',
+          onTap: () async {
+            final messenger = ScaffoldMessenger.of(context);
+            setState(() => _testingNotification = true);
+            try {
+              final demoReminder = reminders.isNotEmpty
+                  ? reminders.first
+                  : _demoReminder();
+              // Fire all 3 perimeter states in sequence
+              await NotificationService.instance.showApproachingNotification(
+                reminder: demoReminder,
+                edgeDistanceMeters: 78,
+              );
+              await Future.delayed(const Duration(milliseconds: 600));
+              await NotificationService.instance.showGeofenceNotification(
+                reminder: demoReminder,
+                isEnter: true,
+              );
+              await Future.delayed(const Duration(milliseconds: 600));
+              await NotificationService.instance.showGeofenceNotification(
+                reminder: demoReminder,
+                isEnter: false,
+                edgeDistanceMeters: 55,
+              );
+              messenger.showSnackBar(const SnackBar(
+                content: Text('🎯 3 Perimeter notifications sent!'),
+                duration: Duration(seconds: 2),
+              ));
+            } finally {
+              if (mounted) setState(() => _testingNotification = false);
+            }
+          },
+        ),
+        _testTile(
+          icon: Icons.task_alt_rounded,
+          iconColor: const Color(0xFF10B981),
+          label: 'Task Status',
+          subtitle: 'Type 3 — Task Completed & Task Pending',
+          onTap: () async {
+            final messenger = ScaffoldMessenger.of(context);
+            setState(() => _testingNotification = true);
+            try {
+              final demoReminder = reminders.isNotEmpty
+                  ? reminders.first
+                  : _demoReminder();
+              await NotificationService.instance.showTaskCompletedNotification(
+                reminder: demoReminder,
+              );
+              await Future.delayed(const Duration(milliseconds: 500));
+              await NotificationService.instance.showTaskPendingNotification(
+                reminder: demoReminder,
+              );
+              messenger.showSnackBar(const SnackBar(
+                content: Text('✅ Task status notifications sent!'),
+                duration: Duration(seconds: 2),
+              ));
+            } finally {
+              if (mounted) setState(() => _testingNotification = false);
+            }
+          },
+        ),
+        _testTile(
+          icon: Icons.bar_chart_rounded,
+          iconColor: const Color(0xFF8B5CF6),
+          label: 'Data Summary',
+          subtitle: 'Type 4 — Active & Remaining Reminders Overview',
+          onTap: () async {
+            final messenger = ScaffoldMessenger.of(context);
+            final provider = context.read<ReminderProvider>();
+            setState(() => _testingNotification = true);
+            try {
+              await provider.showRemindersSummaryNotification();
+              messenger.showSnackBar(const SnackBar(
+                content: Text('📊 Summary notification sent!'),
+                duration: Duration(seconds: 2),
+              ));
+            } finally {
+              if (mounted) setState(() => _testingNotification = false);
+            }
+          },
+        ),
+        if (_testingNotification)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: LinearProgressIndicator(),
+          ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  Widget _testTile({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: iconColor.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(icon, color: iconColor, size: 22),
+      ),
+      title: Text(label,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+      subtitle: Text(subtitle,
+          style: TextStyle(fontSize: 11.5, color: Colors.grey[500])),
+      trailing: Icon(Icons.notifications_active_rounded,
+          color: iconColor, size: 20),
+      onTap: _testingNotification ? null : onTap,
+    );
+  }
+
+  /// Fallback demo [Reminder] used when no real reminders exist yet.
+  Reminder _demoReminder() => Reminder(
+        id: 'demo_test',
+        title: 'Demo Reminder',
+        latitude: 12.9716,
+        longitude: 77.5946,
+        locationName: 'Demo Location',
+        radius: 150,
+        category: ReminderCategory.shopping,
+        priority: ReminderPriority.medium,
+        createdAt: DateTime.now(),
+      );
 }

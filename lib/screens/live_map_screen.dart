@@ -123,12 +123,22 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
             ),
             children: [
               TileLayer(
-                urlTemplate: isDark
-                    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                    : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.smartspot.app',
-                maxZoom: 20,
+                maxZoom: 19,
+                tileBuilder: isDark
+                    ? (context, tileWidget, tile) {
+                        return ColorFiltered(
+                          colorFilter: const ColorFilter.matrix(<double>[
+                            -0.9, 0, 0, 0, 255,
+                            0, -0.9, 0, 0, 255,
+                            0, 0, -0.9, 0, 255,
+                            0, 0, 0, 1, 0,
+                          ]),
+                          child: tileWidget,
+                        );
+                      }
+                    : null,
               ),
 
               // Dynamic Geofence Radius Circle

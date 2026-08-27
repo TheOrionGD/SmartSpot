@@ -64,7 +64,8 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  static const ll.LatLng _fallback = ll.LatLng(11.3410, 77.7172); // Erode, TN fallback
+  static const ll.LatLng _fallback =
+      ll.LatLng(11.3410, 77.7172); // Erode, TN fallback
 
   final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
@@ -85,7 +86,8 @@ class _MapScreenState extends State<MapScreen> {
     super.initState();
     _radius = widget.initialRadius ?? 200.0;
     if (widget.initialLatitude != null && widget.initialLongitude != null) {
-      _selectedPosition = ll.LatLng(widget.initialLatitude!, widget.initialLongitude!);
+      _selectedPosition =
+          ll.LatLng(widget.initialLatitude!, widget.initialLongitude!);
       _resolveAddress(_selectedPosition);
     } else {
       _useCurrentLocation();
@@ -227,8 +229,8 @@ class _MapScreenState extends State<MapScreen> {
         'addressdetails': '0',
         'limit': '8',
         'viewbox':
-        '${_selectedPosition.longitude - 0.3},${_selectedPosition.latitude + 0.3},'
-            '${_selectedPosition.longitude + 0.3},${_selectedPosition.latitude - 0.3}',
+            '${_selectedPosition.longitude - 0.3},${_selectedPosition.latitude + 0.3},'
+                '${_selectedPosition.longitude + 0.3},${_selectedPosition.latitude - 0.3}',
         'bounded': '0',
       });
 
@@ -326,13 +328,38 @@ class _MapScreenState extends State<MapScreen> {
             ),
             children: [
               TileLayer(
-                urlTemplate: isDark
-                    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                    : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.smartspot.app',
-                maxZoom: 20,
-                retinaMode: true, // serves sharp @2x tiles on high-density screens
+                maxZoom: 19,
+                tileBuilder: isDark
+                    ? (context, tileWidget, tile) {
+                        return ColorFiltered(
+                          colorFilter: const ColorFilter.matrix(<double>[
+                            -0.9,
+                            0,
+                            0,
+                            0,
+                            255,
+                            0,
+                            -0.9,
+                            0,
+                            0,
+                            255,
+                            0,
+                            0,
+                            -0.9,
+                            0,
+                            255,
+                            0,
+                            0,
+                            0,
+                            1,
+                            0,
+                          ]),
+                          child: tileWidget,
+                        );
+                      }
+                    : null,
               ),
               // Dynamic Covered Circle Shape around Pinpoint
               CircleLayer(
@@ -341,7 +368,8 @@ class _MapScreenState extends State<MapScreen> {
                     point: _selectedPosition,
                     radius: _radius,
                     useRadiusInMeter: true,
-                    color: AppColors.primary.withValues(alpha: isDark ? 0.25 : 0.18),
+                    color: AppColors.primary
+                        .withValues(alpha: isDark ? 0.25 : 0.18),
                     borderColor: AppColors.primary,
                     borderStrokeWidth: 2.5,
                   ),
@@ -352,7 +380,8 @@ class _MapScreenState extends State<MapScreen> {
           // Fixed centre pin — the map moves underneath it.
           const Padding(
             padding: EdgeInsets.only(bottom: 36),
-            child: Icon(Icons.location_on_rounded, size: 44, color: AppColors.error),
+            child: Icon(Icons.location_on_rounded,
+                size: 44, color: AppColors.error),
           ),
 
           // --- Search bar + results dropdown ---
@@ -374,21 +403,23 @@ class _MapScreenState extends State<MapScreen> {
                       prefixIcon: const Icon(Icons.search),
                       suffixIcon: _isSearching
                           ? const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            )
                           : (_searchController.text.isNotEmpty
-                          ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: _clearSearch,
-                      )
-                          : null),
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: _clearSearch,
+                                )
+                              : null),
                       filled: true,
-                      fillColor: isDark ? const Color(0xFF1E2430) : Colors.white,
+                      fillColor:
+                          isDark ? const Color(0xFF1E2430) : Colors.white,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20),
                         borderSide: BorderSide.none,
@@ -399,7 +430,8 @@ class _MapScreenState extends State<MapScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                        borderSide: const BorderSide(
+                            color: AppColors.primary, width: 1.5),
                       ),
                     ),
                   ),
@@ -412,7 +444,10 @@ class _MapScreenState extends State<MapScreen> {
                       color: isDark ? const Color(0xFF1E2430) : Colors.white,
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: const [
-                        BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 3)),
+                        BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 8,
+                            offset: Offset(0, 3)),
                       ],
                     ),
                     child: ListView.separated(
@@ -423,7 +458,8 @@ class _MapScreenState extends State<MapScreen> {
                       itemBuilder: (context, index) {
                         final result = _searchResults[index];
                         return ListTile(
-                          leading: const Icon(Icons.place_outlined, color: AppColors.primary),
+                          leading: const Icon(Icons.place_outlined,
+                              color: AppColors.primary),
                           title: Text(
                             result.displayName,
                             maxLines: 2,
@@ -450,10 +486,10 @@ class _MapScreenState extends State<MapScreen> {
               onPressed: _isLocating ? null : _useCurrentLocation,
               child: _isLocating
                   ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                   : const Icon(Icons.my_location),
             ),
           ),
@@ -465,7 +501,8 @@ class _MapScreenState extends State<MapScreen> {
             bottom: 16,
             child: Card(
               elevation: 6,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24)),
               color: isDark ? const Color(0xFF161A23) : Colors.white,
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -476,17 +513,20 @@ class _MapScreenState extends State<MapScreen> {
                     // Address Row
                     Row(
                       children: [
-                        const Icon(Icons.place_rounded, size: 20, color: AppColors.primary),
+                        const Icon(Icons.place_rounded,
+                            size: 20, color: AppColors.primary),
                         const SizedBox(width: 8),
                         Expanded(
                           child: _isResolvingAddress
                               ? const Text('Locating address…')
                               : Text(
-                            _address,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
-                          ),
+                                  _address,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13.5),
+                                ),
                         ),
                       ],
                     ),
@@ -494,9 +534,11 @@ class _MapScreenState extends State<MapScreen> {
 
                     // Perimeter Covered Distance & Metrics Bar
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: isDark ? 0.15 : 0.08),
+                        color: AppColors.primary
+                            .withValues(alpha: isDark ? 0.15 : 0.08),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           color: AppColors.primary.withValues(alpha: 0.25),
@@ -510,13 +552,19 @@ class _MapScreenState extends State<MapScreen> {
                             '${_radius.toInt()} m',
                             Icons.radar_rounded,
                           ),
-                          Container(width: 1, height: 26, color: AppColors.primary.withValues(alpha: 0.3)),
+                          Container(
+                              width: 1,
+                              height: 26,
+                              color: AppColors.primary.withValues(alpha: 0.3)),
                           _perimeterMetricColumn(
                             'Perimeter Distance',
                             perimeterDistance,
                             Icons.all_inclusive_rounded,
                           ),
-                          Container(width: 1, height: 26, color: AppColors.primary.withValues(alpha: 0.3)),
+                          Container(
+                              width: 1,
+                              height: 26,
+                              color: AppColors.primary.withValues(alpha: 0.3)),
                           _perimeterMetricColumn(
                             'Covered Area',
                             coverageArea,
@@ -532,14 +580,16 @@ class _MapScreenState extends State<MapScreen> {
                       children: [
                         const Text(
                           'Radius:',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w600),
                         ),
                         Expanded(
                           child: SliderTheme(
                             data: SliderTheme.of(context).copyWith(
                               activeTrackColor: AppColors.primary,
                               thumbColor: AppColors.primary,
-                              overlayColor: AppColors.primary.withValues(alpha: 0.15),
+                              overlayColor:
+                                  AppColors.primary.withValues(alpha: 0.15),
                               trackHeight: 3.5,
                             ),
                             child: Slider(
@@ -554,7 +604,10 @@ class _MapScreenState extends State<MapScreen> {
                         ),
                         Text(
                           '${_radius.toInt()}m',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary),
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary),
                         ),
                       ],
                     ),

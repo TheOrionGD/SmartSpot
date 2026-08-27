@@ -3,6 +3,7 @@ import '../models/reminder.dart';
 import '../services/database_service.dart';
 import '../services/intelligence_service.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 
 class ReminderProvider extends ChangeNotifier {
   final DatabaseService _dbService = DatabaseService();
@@ -186,6 +187,19 @@ class ReminderProvider extends ChangeNotifier {
       }
       await loadReminders();
       await loadStatistics();
+      // Type 3 — Task Pending: new reminder created
+      try {
+        await NotificationService.instance.showTaskPendingNotification(
+          reminder: created,
+        );
+      } catch (_) {}
+      if (created.dueDate != null) {
+        try {
+          await NotificationService.instance.scheduleTimeDueNotification(
+            reminder: created,
+          );
+        } catch (_) {}
+      }
       return id;
     } catch (e) {
       debugPrint('Error adding reminder: $e');
@@ -203,6 +217,18 @@ class ReminderProvider extends ChangeNotifier {
       }
       await loadReminders();
       await loadStatistics();
+      if (reminder.isCompleted || reminder.dueDate == null) {
+        try {
+          await NotificationService.instance
+              .cancelScheduledTimeDueNotification(reminder.id);
+        } catch (_) {}
+      } else {
+        try {
+          await NotificationService.instance.scheduleTimeDueNotification(
+            reminder: reminder,
+          );
+        } catch (_) {}
+      }
     } catch (e) {
       debugPrint('Error updating reminder: $e');
       rethrow;
@@ -216,6 +242,25 @@ class ReminderProvider extends ChangeNotifier {
       if (updated != null) {
         try {
           await _apiService.toggleComplete(id, isCompleted: updated.isCompleted);
+        } catch (_) {}
+        // Type 3 — Task Completed / Task Pending notifications
+        try {
+          if (updated.isCompleted) {
+            await NotificationService.instance.showTaskCompletedNotification(
+              reminder: updated,
+            );
+            await NotificationService.instance
+                .cancelScheduledTimeDueNotification(updated.id);
+          } else {
+            await NotificationService.instance.showTaskPendingNotification(
+              reminder: updated,
+            );
+            if (updated.dueDate != null) {
+              await NotificationService.instance.scheduleTimeDueNotification(
+                reminder: updated,
+              );
+            }
+          }
         } catch (_) {}
       }
       await loadReminders();
@@ -231,6 +276,10 @@ class ReminderProvider extends ChangeNotifier {
     try {
       await _dbService.archiveReminder(id);
       try {
+        await NotificationService.instance
+            .cancelScheduledTimeDueNotification(id);
+      } catch (_) {}
+      try {
         await _apiService.toggleArchive(id, isArchived: true);
       } catch (_) {}
       await loadReminders();
@@ -245,6 +294,10 @@ class ReminderProvider extends ChangeNotifier {
   Future<void> deleteReminder(String id) async {
     try {
       await _dbService.deleteReminder(id);
+      try {
+        await NotificationService.instance
+            .cancelScheduledTimeDueNotification(id);
+      } catch (_) {}
       try {
         await _apiService.deleteReminder(id);
       } catch (_) {}
@@ -271,6 +324,29 @@ class ReminderProvider extends ChangeNotifier {
           .toList();
     }
     notifyListeners();
+  }
+
+  // ─── Type 4 — Reminders Data Summary ───────────────────────────────────
+
+  /// Fires a summary notification showing active, pending, and completed counts.
+  ///
+  /// Call this from Settings → "Test Summary Notification" or on-demand.
+  Future<void> showRemindersSummaryNotification() async {
+    final active = _allReminders.where((r) => !r.isCompleted).length;
+    final completed = _statistics['completed'] ?? 0;
+    final pending = _allReminders
+        .where((r) => !r.isCompleted && r.dueDate != null)
+        .length;
+    try {
+      await NotificationService.instance.showActiveRemindersSummaryNotification(
+        activeCount: active,
+        pendingCount: pending,
+        completedCount: completed,
+        reminders: _allReminders,
+      );
+    } catch (e) {
+      debugPrint('Summary notification failed: $e');
+    }
   }
 
   @override

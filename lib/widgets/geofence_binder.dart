@@ -7,6 +7,7 @@ import '../providers/settings_provider.dart';
 import '../services/location_service.dart';
 import '../services/notification_service.dart';
 import '../services/intelligence_service.dart';
+import '../screens/perimeter_alert_screen.dart';
 
 /// Wraps the main app content and owns the lifecycle of geofence
 /// monitoring: starts it when Background Monitoring is enabled (and
@@ -34,17 +35,68 @@ class _GeofenceBinderState extends State<GeofenceBinder> {
   // can be evaluated as a batch (for bundling) and against quiet hours.
   final List<({Reminder reminder, bool isEnter, double? edgeDistanceMeters})> _pendingEvents = [];
   Timer? _flushTimer;
+  Timer? _timeAlertCheckTimer;
+  final Set<String> _triggeredTimeAlarms = {};
 
   @override
   void initState() {
     super.initState();
     _reminderProvider = context.read<ReminderProvider>();
+    _timeAlertCheckTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _checkTimeAlarms();
+    });
   }
 
   @override
   void dispose() {
     _flushTimer?.cancel();
+    _timeAlertCheckTimer?.cancel();
     super.dispose();
+  }
+
+  void _checkTimeAlarms() {
+    final now = DateTime.now();
+    final reminders = _reminderProvider.allReminders;
+    final settings = context.read<SettingsProvider>();
+
+    for (final reminder in reminders) {
+      if (reminder.isCompleted || reminder.dueDate == null) {
+        _triggeredTimeAlarms.remove(reminder.id);
+        continue;
+      }
+
+      // If the due date is in the future (e.g. from snooze or update), reset the triggered state.
+      if (reminder.dueDate!.isAfter(now)) {
+        _triggeredTimeAlarms.remove(reminder.id);
+      }
+
+      if (_triggeredTimeAlarms.contains(reminder.id)) continue;
+
+      if (now.isAfter(reminder.dueDate!) &&
+          now.difference(reminder.dueDate!).inMinutes < 5) {
+        _triggeredTimeAlarms.add(reminder.id);
+
+        if (settings.notificationsEnabled) {
+          if (!settings.isWithinQuietHours() ||
+              (settings.allowHighPriorityDuringQuietHours &&
+                  reminder.priority == ReminderPriority.high)) {
+            NotificationService.instance.showTimeDueNotification(
+              reminder: reminder,
+              withSound: settings.soundEnabled,
+              withVibration: settings.vibrationEnabled,
+            );
+          }
+        }
+
+        if (mounted) {
+          PerimeterAlertScreen.show(
+            context,
+            reminder: reminder,
+            alertType: AlertPerimeterType.timeDue,
+          );
+        }
+      }
+    }
   }
 
   Future<void> _syncMonitoring(SettingsProvider settings) async {
