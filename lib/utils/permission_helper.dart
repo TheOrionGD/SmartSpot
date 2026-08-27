@@ -123,6 +123,16 @@ class PermissionHelper {
 
     status = await Permission.notification.request();
 
+    // Also request exact alarm permission on Android 12+ so alarms can wake the device when closed
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        final alarmStatus = await Permission.scheduleExactAlarm.status;
+        if (!alarmStatus.isGranted) {
+          await Permission.scheduleExactAlarm.request();
+        }
+      } catch (_) {}
+    }
+
     if (status.isPermanentlyDenied) {
       if (context.mounted) {
         _showOpenSettingsDialog(
@@ -204,6 +214,30 @@ class PermissionHelper {
         permission == LocationPermission.always;
   }
 
+  /// Requests exemption from battery optimizations on Android so background
+  /// alarms and location tracking are not killed when the app is closed.
+  static Future<bool> requestIgnoreBatteryOptimizations(BuildContext context) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return true;
+
+    final status = await Permission.ignoreBatteryOptimizations.status;
+    if (status.isGranted) return true;
+
+    if (!context.mounted) return false;
+
+    final shouldProceed = await _showRationale(
+      context: context,
+      icon: Icons.battery_charging_full_rounded,
+      title: 'Unrestricted Background Battery',
+      message:
+          'To ensure reminder alarms trigger reliably when the app is closed or '
+          'phone is locked, please allow SmartSpot to run without battery restrictions.',
+    );
+    if (!shouldProceed || !context.mounted) return false;
+
+    final result = await Permission.ignoreBatteryOptimizations.request();
+    return result.isGranted;
+  }
+
   /// Requests all runtime permissions sequentially (Location, Background Location, Notifications).
   static Future<void> requestAll(BuildContext context) async {
     final hasLoc = await requestLocationPermission(context);
@@ -212,6 +246,9 @@ class PermissionHelper {
     }
     if (context.mounted) {
       await requestNotificationPermission(context);
+    }
+    if (context.mounted && !kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      await requestIgnoreBatteryOptimizations(context);
     }
   }
 

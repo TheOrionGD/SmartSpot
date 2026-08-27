@@ -105,6 +105,23 @@ class ReminderProvider extends ChangeNotifier {
     _missedCheckedThisSession.remove(updated.id);
   }
 
+  Future<void> _scheduleAllActiveReminders() async {
+    final now = DateTime.now();
+    for (final reminder in _allReminders) {
+      if (!reminder.isCompleted &&
+          reminder.dueDate != null &&
+          reminder.dueDate!.isAfter(now)) {
+        try {
+          await NotificationService.instance.scheduleTimeDueNotification(
+            reminder: reminder,
+          );
+        } catch (e) {
+          debugPrint('Error scheduling reminder ${reminder.id}: $e');
+        }
+      }
+    }
+  }
+
   Future<void> loadReminders() async {
     try {
       await _dbService.resetDueRecurringReminders();
@@ -113,6 +130,7 @@ class ReminderProvider extends ChangeNotifier {
           ? _allReminders
           : _allReminders.where((r) => r.category == _selectedCategory).toList();
       notifyListeners();
+      await _scheduleAllActiveReminders();
     } catch (e) {
       debugPrint('Error loading reminders: $e');
     }

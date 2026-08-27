@@ -20,6 +20,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool? _locationGranted;
   bool? _notificationGranted;
+  bool? _batteryUnrestricted;
   bool _testingNotification = false;
 
   @override
@@ -31,10 +32,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _refreshPermissionStatus() async {
     final location = await PermissionHelper.hasLocationPermission();
     final notification = await PermissionHelper.hasNotificationPermission();
+    final battery = await Permission.ignoreBatteryOptimizations.isGranted;
     if (mounted) {
       setState(() {
         _locationGranted = location;
         _notificationGranted = notification;
+        _batteryUnrestricted = battery;
       });
     }
   }
@@ -273,6 +276,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
           ),
           ListTile(
+            leading: Icon(
+              Icons.battery_saver_outlined,
+              color: _batteryUnrestricted == true ? AppColors.success : Colors.grey,
+            ),
+            title: const Text('Background Battery'),
+            subtitle: Text(_batteryUnrestricted == null
+                ? 'Checking…'
+                : _batteryUnrestricted!
+                    ? 'Unrestricted (Alarms reliable)'
+                    : 'Optimized — tap to allow unrestricted'),
+            trailing: _batteryUnrestricted == true
+                ? const Icon(Icons.check_circle, color: AppColors.success, size: 20)
+                : const Icon(Icons.chevron_right),
+            onTap: () async {
+              await PermissionHelper.requestIgnoreBatteryOptimizations(context);
+              _refreshPermissionStatus();
+            },
+          ),
+          ListTile(
             leading: const Icon(Icons.settings_applications_outlined, color: AppColors.primary),
             title: const Text('Open Device App Settings'),
             trailing: const Icon(Icons.open_in_new, size: 18),
@@ -341,7 +363,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const ListTile(
             leading: Icon(Icons.info_outline),
             title: Text('App Version'),
-            subtitle: Text('1.0.0'),
+            subtitle: Text('4.3.5'),
           ),
           const SizedBox(height: 24),
         ],

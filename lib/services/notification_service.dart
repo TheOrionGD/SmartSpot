@@ -27,32 +27,32 @@ class NotificationService {
   bool _initialized = false;
 
   // ─── Channel: Perimeter Alerts (Type 2) ───────────────────────────────────
-  static const String _geofenceChannelId = 'smartspot_geofence_alerts_channel_v2';
+  static const String _geofenceChannelId = 'smartspot_geofence_alerts_channel_v3';
   static const String _geofenceChannelName = 'Location Reminders';
   static const String _geofenceChannelDescription =
       'Alerts you when you enter, leave, or approach a reminder location';
 
   // ─── Channel: Due Time Alarms (Type 5) ────────────────────────────────────
-  static const String _alarmChannelId = 'smartspot_alarm_channel_v2';
+  static const String _alarmChannelId = 'smartspot_alarm_channel_v3';
   static const String _alarmChannelName = 'Reminder Alarms';
   static const String _alarmChannelDescription =
       'Alerts you with sound and vibration when a reminder due time is reached';
 
   // ─── Channel: Live Perimeter Navigation (Type 1) ──────────────────────────
   static const String _liveMonitorChannelId =
-      'smartspot_live_guidance_channel_v2';
+      'smartspot_live_guidance_channel_v3';
   static const String _liveMonitorChannelName = 'Live Perimeter Navigation';
   static const String _liveMonitorChannelDescription =
       'Shows live distance to nearby perimeter locations like Google Maps';
 
   // ─── Channel: Task Status (Type 3) ────────────────────────────────────────
-  static const String _taskChannelId = 'smartspot_task_status_channel_v2';
+  static const String _taskChannelId = 'smartspot_task_status_channel_v3';
   static const String _taskChannelName = 'Task Status';
   static const String _taskChannelDescription =
       'Notifies you when a task is completed or pending';
 
   // ─── Channel: Reminders Summary (Type 4) ──────────────────────────────────
-  static const String _summaryChannelId = 'smartspot_summary_channel_v2';
+  static const String _summaryChannelId = 'smartspot_summary_channel_v3';
   static const String _summaryChannelName = 'Reminders Summary';
   static const String _summaryChannelDescription =
       'Shows an overview of your active, pending, and completed reminders';
@@ -137,6 +137,13 @@ class NotificationService {
             .resolvePlatformSpecificImplementation<
                 AndroidFlutterLocalNotificationsPlugin>();
 
+        try {
+          await androidPlugin?.requestNotificationsPermission();
+          await androidPlugin?.requestExactAlarmsPermission();
+        } catch (e) {
+          debugPrint('Error requesting Android notification/alarm permissions: $e');
+        }
+
         const customSound =
             RawResourceAndroidNotificationSound('vibration_sound');
 
@@ -152,6 +159,8 @@ class NotificationService {
             enableVibration: true,
             vibrationPattern: _insideVibration,
             audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+            enableLights: true,
+            showBadge: true,
           ),
         );
 
@@ -179,6 +188,8 @@ class NotificationService {
             enableVibration: true,
             vibrationPattern: _completedVibration,
             audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+            enableLights: true,
+            showBadge: true,
           ),
         );
 
@@ -205,8 +216,10 @@ class NotificationService {
             playSound: true,
             sound: customSound,
             enableVibration: true,
-            vibrationPattern: Int64List.fromList([0, 500, 200, 500, 200, 500]),
+            vibrationPattern: Int64List.fromList([0, 800, 400, 800, 400, 1000]),
             audioAttributesUsage: AudioAttributesUsage.alarm,
+            enableLights: true,
+            showBadge: true,
           ),
         );
       }
@@ -782,7 +795,7 @@ class NotificationService {
       _alarmChannelName,
       channelDescription: _alarmChannelDescription,
       importance: Importance.max,
-      priority: Priority.high,
+      priority: Priority.max,
       category: AndroidNotificationCategory.alarm,
       audioAttributesUsage: AudioAttributesUsage.alarm,
       visibility: NotificationVisibility.public,
@@ -791,7 +804,8 @@ class NotificationService {
           ? const RawResourceAndroidNotificationSound('vibration_sound')
           : null,
       enableVibration: withVibration,
-      vibrationPattern: Int64List.fromList([0, 500, 200, 500, 200, 500]),
+      vibrationPattern: Int64List.fromList([0, 800, 400, 800, 400, 1000]),
+      fullScreenIntent: true,
       styleInformation: BigTextStyleInformation(
         body,
         contentTitle: title,
@@ -848,14 +862,15 @@ class NotificationService {
       _alarmChannelName,
       channelDescription: _alarmChannelDescription,
       importance: Importance.max,
-      priority: Priority.high,
+      priority: Priority.max,
       category: AndroidNotificationCategory.alarm,
       audioAttributesUsage: AudioAttributesUsage.alarm,
       visibility: NotificationVisibility.public,
       playSound: true,
       sound: const RawResourceAndroidNotificationSound('vibration_sound'),
       enableVibration: true,
-      vibrationPattern: Int64List.fromList([0, 500, 200, 500, 200, 500]),
+      vibrationPattern: Int64List.fromList([0, 800, 400, 800, 400, 1000]),
+      fullScreenIntent: true,
       styleInformation: BigTextStyleInformation(
         body,
         contentTitle: title,
@@ -885,17 +900,34 @@ class NotificationService {
 
     await _plugin.cancel(notificationId);
 
-    await _plugin.zonedSchedule(
-      notificationId,
-      title,
-      'The scheduled time has arrived for: ${reminder.title}',
-      tz.TZDateTime.from(reminder.dueDate!, tz.local),
-      NotificationDetails(android: androidDetails, iOS: iosDetails),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      payload: reminder.id,
-    );
+    final scheduledDate = tz.TZDateTime.from(reminder.dueDate!, tz.local);
+
+    try {
+      await _plugin.zonedSchedule(
+        notificationId,
+        title,
+        'The scheduled time has arrived for: ${reminder.title}',
+        scheduledDate,
+        NotificationDetails(android: androidDetails, iOS: iosDetails),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: reminder.id,
+      );
+    } catch (e) {
+      debugPrint('Exact alarm zonedSchedule failed, falling back to inexact: $e');
+      await _plugin.zonedSchedule(
+        notificationId,
+        title,
+        'The scheduled time has arrived for: ${reminder.title}',
+        scheduledDate,
+        NotificationDetails(android: androidDetails, iOS: iosDetails),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: reminder.id,
+      );
+    }
   }
 
   Future<void> cancelScheduledTimeDueNotification(String reminderId) async {

@@ -337,6 +337,21 @@ class _AppRoot extends StatelessWidget {
       themeMode: settings.themeMode,
       home: const SplashScreen(),
       debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Container(
+          color: isDark ? const Color(0xFF0F1117) : const Color(0xFFE2E6EF),
+          alignment: Alignment.center,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 480,
+            ),
+            child: ClipRect(
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
+        );
+      },
     );
   }
 }
