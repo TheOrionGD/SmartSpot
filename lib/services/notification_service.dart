@@ -4,6 +4,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:vibration/vibration.dart';
 import '../models/reminder.dart';
 import '../utils/web_notification/web_notification.dart';
 
@@ -27,32 +28,32 @@ class NotificationService {
   bool _initialized = false;
 
   // ─── Channel: Perimeter Alerts (Type 2) ───────────────────────────────────
-  static const String _geofenceChannelId = 'smartspot_geofence_alerts_channel_v3';
+  static const String _geofenceChannelId = 'smartspot_geofence_alerts_v5';
   static const String _geofenceChannelName = 'Location Reminders';
   static const String _geofenceChannelDescription =
       'Alerts you when you enter, leave, or approach a reminder location';
 
   // ─── Channel: Due Time Alarms (Type 5) ────────────────────────────────────
-  static const String _alarmChannelId = 'smartspot_alarm_channel_v4';
+  static const String _alarmChannelId = 'smartspot_alarm_channel_v5';
   static const String _alarmChannelName = 'Reminder Alarms';
   static const String _alarmChannelDescription =
-      'Alerts you with sound and vibration when a reminder due time is reached';
+      'Alerts you with loud sound and vibration when a reminder due time is reached';
 
   // ─── Channel: Live Perimeter Navigation (Type 1) ──────────────────────────
   static const String _liveMonitorChannelId =
-      'smartspot_live_guidance_channel_v3';
+      'smartspot_live_guidance_v5';
   static const String _liveMonitorChannelName = 'Live Perimeter Navigation';
   static const String _liveMonitorChannelDescription =
       'Shows live distance to nearby perimeter locations like Google Maps';
 
   // ─── Channel: Task Status (Type 3) ────────────────────────────────────────
-  static const String _taskChannelId = 'smartspot_task_status_channel_v3';
+  static const String _taskChannelId = 'smartspot_task_status_v5';
   static const String _taskChannelName = 'Task Status';
   static const String _taskChannelDescription =
       'Notifies you when a task is completed or pending';
 
   // ─── Channel: Reminders Summary (Type 4) ──────────────────────────────────
-  static const String _summaryChannelId = 'smartspot_summary_channel_v3';
+  static const String _summaryChannelId = 'smartspot_summary_v5';
   static const String _summaryChannelName = 'Reminders Summary';
   static const String _summaryChannelDescription =
       'Shows an overview of your active, pending, and completed reminders';
@@ -71,7 +72,7 @@ class NotificationService {
 
   /// One strong pulse — "you are inside"
   static final Int64List _insideVibration =
-      Int64List.fromList([0, 600, 0, 0]);
+      Int64List.fromList([0, 800, 200, 800]);
 
   /// Three escalating pulses — "alert, you left"
   static final Int64List _leftVibration =
@@ -98,6 +99,20 @@ class NotificationService {
       final km = distanceMeters / 1000.0;
       return '${km.toStringAsFixed(1)}km';
     }
+  }
+
+  /// Triggers real hardware motor vibration via [Vibration] package in addition to system haptics
+  Future<void> _triggerHardwareVibration(List<int> pattern) async {
+    if (kIsWeb) return;
+    try {
+      final hasVibrator = await Vibration.hasVibrator();
+      if (hasVibrator == true) {
+        await Vibration.vibrate(pattern: pattern);
+      }
+    } catch (_) {}
+    try {
+      HapticFeedback.heavyImpact();
+    } catch (_) {}
   }
 
   // ─── Initialisation ────────────────────────────────────────────────────────
@@ -150,16 +165,25 @@ class NotificationService {
           debugPrint('Error requesting Android notification/alarm permissions: $e');
         }
 
+        // Clean up legacy channel IDs to ensure new high-priority settings take effect
+        try {
+          await androidPlugin?.deleteNotificationChannel('smartspot_geofence_alerts_channel_v3');
+          await androidPlugin?.deleteNotificationChannel('smartspot_alarm_channel_v4');
+          await androidPlugin?.deleteNotificationChannel('smartspot_live_guidance_channel_v3');
+          await androidPlugin?.deleteNotificationChannel('smartspot_task_status_channel_v3');
+          await androidPlugin?.deleteNotificationChannel('smartspot_summary_channel_v3');
+        } catch (_) {}
+
         const customSound =
             RawResourceAndroidNotificationSound('vibration_sound');
 
-        // 1. Geofence / perimeter alerts channel
+        // 1. Geofence / perimeter alerts channel (High priority, Sound + Vibration)
         await androidPlugin?.createNotificationChannel(
           AndroidNotificationChannel(
             _geofenceChannelId,
             _geofenceChannelName,
             description: _geofenceChannelDescription,
-            importance: Importance.high,
+            importance: Importance.max,
             playSound: true,
             sound: customSound,
             enableVibration: true,
@@ -170,7 +194,7 @@ class NotificationService {
           ),
         );
 
-        // 2. Live perimeter navigation / active watch channel (silent)
+        // 2. Live perimeter navigation / active watch channel (silent, ongoing)
         await androidPlugin?.createNotificationChannel(
           const AndroidNotificationChannel(
             _liveMonitorChannelId,
@@ -212,7 +236,7 @@ class NotificationService {
           ),
         );
 
-        // 5. Alarm channel (Loud Time Due alarms)
+        // 5. Alarm channel (Loud Time Due alarms, Max Importance, Alarm audio attribute)
         await androidPlugin?.createNotificationChannel(
           AndroidNotificationChannel(
             _alarmChannelId,
@@ -313,9 +337,7 @@ class NotificationService {
     if (!_initialized) await init();
 
     if (withVibration) {
-      try {
-        HapticFeedback.mediumImpact();
-      } catch (_) {}
+      _triggerHardwareVibration([0, 300, 150, 300]);
     }
 
     final categoryName = reminder.category.name.toUpperCase();
@@ -335,8 +357,8 @@ class NotificationService {
       _geofenceChannelId,
       _geofenceChannelName,
       channelDescription: _geofenceChannelDescription,
-      importance: Importance.high,
-      priority: Priority.high,
+      importance: Importance.max,
+      priority: Priority.max,
       category: AndroidNotificationCategory.reminder,
       audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
       visibility: NotificationVisibility.public,
@@ -401,17 +423,11 @@ class NotificationService {
     if (!_initialized) await init();
 
     if (withVibration) {
-      try {
-        if (isEnter) {
-          HapticFeedback.heavyImpact();
-        } else {
-          HapticFeedback.heavyImpact();
-          Future.delayed(const Duration(milliseconds: 200),
-              () => HapticFeedback.heavyImpact());
-          Future.delayed(const Duration(milliseconds: 450),
-              () => HapticFeedback.heavyImpact());
-        }
-      } catch (_) {}
+      if (isEnter) {
+        _triggerHardwareVibration([0, 800, 200, 800]);
+      } else {
+        _triggerHardwareVibration([0, 600, 200, 600, 200, 800]);
+      }
     }
 
     final categoryName = reminder.category.name.toUpperCase();
@@ -445,8 +461,8 @@ class NotificationService {
       _geofenceChannelId,
       _geofenceChannelName,
       channelDescription: _geofenceChannelDescription,
-      importance: Importance.high,
-      priority: Priority.high,
+      importance: Importance.max,
+      priority: Priority.max,
       category: AndroidNotificationCategory.reminder,
       audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
       visibility: NotificationVisibility.public,
@@ -517,10 +533,7 @@ class NotificationService {
     bool withVibration = true,
   }) async {
     if (withVibration) {
-      try {
-        HapticFeedback.heavyImpact();
-        HapticFeedback.vibrate();
-      } catch (_) {}
+      _triggerHardwareVibration([0, 500, 250, 500]);
     }
 
     if (events.length == 1) {
@@ -567,8 +580,8 @@ class NotificationService {
       _geofenceChannelId,
       _geofenceChannelName,
       channelDescription: _geofenceChannelDescription,
-      importance: Importance.high,
-      priority: Priority.high,
+      importance: Importance.max,
+      priority: Priority.max,
       category: AndroidNotificationCategory.reminder,
       audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
       visibility: NotificationVisibility.public,
@@ -627,11 +640,7 @@ class NotificationService {
     }
 
     if (withVibration) {
-      try {
-        HapticFeedback.mediumImpact();
-        Future.delayed(const Duration(milliseconds: 150),
-            () => HapticFeedback.lightImpact());
-      } catch (_) {}
+      _triggerHardwareVibration([0, 200, 100, 400]);
     }
 
     final categoryName = reminder.category.name.toUpperCase();
@@ -701,11 +710,7 @@ class NotificationService {
     }
 
     if (withVibration) {
-      try {
-        HapticFeedback.lightImpact();
-        Future.delayed(
-            const Duration(milliseconds: 200), () => HapticFeedback.lightImpact());
-      } catch (_) {}
+      _triggerHardwareVibration([0, 400, 200, 400]);
     }
 
     final categoryName = reminder.category.name.toUpperCase();
@@ -718,8 +723,8 @@ class NotificationService {
       _taskChannelId,
       _taskChannelName,
       channelDescription: _taskChannelDescription,
-      importance: Importance.defaultImportance,
-      priority: Priority.defaultPriority,
+      importance: Importance.high,
+      priority: Priority.high,
       category: AndroidNotificationCategory.reminder,
       visibility: NotificationVisibility.public,
       playSound: withSound,
@@ -781,13 +786,7 @@ class NotificationService {
     }
 
     if (withVibration) {
-      try {
-        HapticFeedback.heavyImpact();
-        Future.delayed(const Duration(milliseconds: 150),
-            () => HapticFeedback.heavyImpact());
-        Future.delayed(const Duration(milliseconds: 300),
-            () => HapticFeedback.heavyImpact());
-      } catch (_) {}
+      _triggerHardwareVibration([0, 800, 400, 800, 400, 1000]);
     }
 
     final categoryName = reminder.category.name.toUpperCase();
