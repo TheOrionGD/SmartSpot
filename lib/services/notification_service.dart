@@ -33,7 +33,7 @@ class NotificationService {
       'Alerts you when you enter, leave, or approach a reminder location';
 
   // ─── Channel: Due Time Alarms (Type 5) ────────────────────────────────────
-  static const String _alarmChannelId = 'smartspot_alarm_channel_v3';
+  static const String _alarmChannelId = 'smartspot_alarm_channel_v4';
   static const String _alarmChannelName = 'Reminder Alarms';
   static const String _alarmChannelDescription =
       'Alerts you with sound and vibration when a reminder due time is reached';
@@ -110,19 +110,25 @@ class NotificationService {
 
     try {
       tz.initializeTimeZones();
-      final tzInfo = await FlutterTimezone.getLocalTimezone();
-      tz.setLocalLocation(tz.getLocation(tzInfo.identifier));
+      final dynamic timeZoneResult = await FlutterTimezone.getLocalTimezone();
+      final String timeZoneName = (timeZoneResult is String)
+          ? timeZoneResult
+          : (timeZoneResult?.identifier?.toString() ?? 'UTC');
+      tz.setLocalLocation(tz.getLocation(timeZoneName));
     } catch (e) {
       debugPrint('NotificationService timezone init failed: $e');
+      try {
+        tz.setLocalLocation(tz.getLocation('UTC'));
+      } catch (_) {}
     }
 
     try {
       const androidInit =
           AndroidInitializationSettings('@mipmap/ic_launcher');
       const iosInit = DarwinInitializationSettings(
-        requestAlertPermission: false,
-        requestBadgePermission: false,
-        requestSoundPermission: false,
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
       );
 
       const initSettings = InitializationSettings(
@@ -900,7 +906,10 @@ class NotificationService {
 
     await _plugin.cancel(notificationId);
 
-    final scheduledDate = tz.TZDateTime.from(reminder.dueDate!, tz.local);
+    final due = reminder.dueDate!.toLocal();
+    final scheduledDate = tz.TZDateTime.from(due, tz.local);
+    final tzNow = tz.TZDateTime.now(tz.local);
+    if (scheduledDate.isBefore(tzNow)) return;
 
     try {
       await _plugin.zonedSchedule(

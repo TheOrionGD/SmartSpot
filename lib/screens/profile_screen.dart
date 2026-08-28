@@ -643,7 +643,7 @@ class ProfileScreen extends StatelessWidget {
                           showAboutDialog(
                             context: context,
                             applicationName: 'SmartSpot',
-                            applicationVersion: '4.3.5',
+                            applicationVersion: '5.1.2',
                             applicationLegalese: 'Location-Based Smart Reminder Application',
                           );
                         },

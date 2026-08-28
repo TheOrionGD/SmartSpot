@@ -2,7 +2,7 @@ name: smartspot
 description: "SmartSpot - Location-Based Reminder App (Phase 1)"
 publish_to: 'none'
 
-version: 4.3.5+5
+version: 5.1.2+6
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

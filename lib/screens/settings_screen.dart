@@ -363,7 +363,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const ListTile(
             leading: Icon(Icons.info_outline),
             title: Text('App Version'),
-            subtitle: Text('4.3.5'),
+            subtitle: Text('5.1.2'),
           ),
           const SizedBox(height: 24),
         ],
