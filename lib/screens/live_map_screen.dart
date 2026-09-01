@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:provider/provider.dart';
@@ -40,7 +39,6 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
   }
 
   void _fitViewport(ll.LatLng destPos, ll.LatLng? userPos) {
-    HapticFeedback.selectionClick();
     if (userPos == null) {
       _mapController.move(destPos, 15);
       return;
@@ -56,7 +54,6 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
   }
 
   void _centerOnUser(ll.LatLng? userPos) {
-    HapticFeedback.mediumImpact();
     if (userPos != null) {
       _mapController.move(userPos, 16);
     } else {
@@ -67,7 +64,6 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
   }
 
   void _centerOnDestination(ll.LatLng destPos) {
-    HapticFeedback.selectionClick();
     _mapController.move(destPos, 16);
   }
 

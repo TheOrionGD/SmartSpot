@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -27,33 +27,37 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
   bool _initialized = false;
 
+  // ─── Notification Small Icon ──────────────────────────────────────────────
+  /// Resource name only — NO '@drawable/' prefix (flutter_local_notifications requirement)
+  static const String notificationIcon = 'ic_notification';
+
   // ─── Channel: Perimeter Alerts (Type 2) ───────────────────────────────────
-  static const String _geofenceChannelId = 'smartspot_geofence_alerts_v5';
+  static const String _geofenceChannelId = 'smartspot_geofence_alerts_v6';
   static const String _geofenceChannelName = 'Location Reminders';
   static const String _geofenceChannelDescription =
       'Alerts you when you enter, leave, or approach a reminder location';
 
   // ─── Channel: Due Time Alarms (Type 5) ────────────────────────────────────
-  static const String _alarmChannelId = 'smartspot_alarm_channel_v5';
+  static const String _alarmChannelId = 'smartspot_alarm_channel_v6';
   static const String _alarmChannelName = 'Reminder Alarms';
   static const String _alarmChannelDescription =
       'Alerts you with loud sound and vibration when a reminder due time is reached';
 
   // ─── Channel: Live Perimeter Navigation (Type 1) ──────────────────────────
   static const String _liveMonitorChannelId =
-      'smartspot_live_guidance_v5';
+      'smartspot_live_guidance_v6';
   static const String _liveMonitorChannelName = 'Live Perimeter Navigation';
   static const String _liveMonitorChannelDescription =
       'Shows live distance to nearby perimeter locations like Google Maps';
 
   // ─── Channel: Task Status (Type 3) ────────────────────────────────────────
-  static const String _taskChannelId = 'smartspot_task_status_v5';
+  static const String _taskChannelId = 'smartspot_task_status_v6';
   static const String _taskChannelName = 'Task Status';
   static const String _taskChannelDescription =
       'Notifies you when a task is completed or pending';
 
   // ─── Channel: Reminders Summary (Type 4) ──────────────────────────────────
-  static const String _summaryChannelId = 'smartspot_summary_v5';
+  static const String _summaryChannelId = 'smartspot_summary_v6';
   static const String _summaryChannelName = 'Reminders Summary';
   static const String _summaryChannelDescription =
       'Shows an overview of your active, pending, and completed reminders';
@@ -101,7 +105,7 @@ class NotificationService {
     }
   }
 
-  /// Triggers real hardware motor vibration via [Vibration] package in addition to system haptics
+  /// Triggers real hardware motor vibration via [Vibration] package
   Future<void> _triggerHardwareVibration(List<int> pattern) async {
     if (kIsWeb) return;
     try {
@@ -109,9 +113,6 @@ class NotificationService {
       if (hasVibrator == true) {
         await Vibration.vibrate(pattern: pattern);
       }
-    } catch (_) {}
-    try {
-      HapticFeedback.heavyImpact();
     } catch (_) {}
   }
 
@@ -138,8 +139,10 @@ class NotificationService {
     }
 
     try {
+      // NOTE: flutter_local_notifications requires just the resource name,
+      // NOT the '@drawable/' or '@mipmap/' prefix.
       const androidInit =
-          AndroidInitializationSettings('@mipmap/ic_launcher');
+          AndroidInitializationSettings('ic_notification');
       const iosInit = DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
@@ -167,11 +170,11 @@ class NotificationService {
 
         // Clean up legacy channel IDs to ensure new high-priority settings take effect
         try {
-          await androidPlugin?.deleteNotificationChannel('smartspot_geofence_alerts_channel_v3');
-          await androidPlugin?.deleteNotificationChannel('smartspot_alarm_channel_v4');
-          await androidPlugin?.deleteNotificationChannel('smartspot_live_guidance_channel_v3');
-          await androidPlugin?.deleteNotificationChannel('smartspot_task_status_channel_v3');
-          await androidPlugin?.deleteNotificationChannel('smartspot_summary_channel_v3');
+          await androidPlugin?.deleteNotificationChannel('smartspot_geofence_alerts_v5');
+          await androidPlugin?.deleteNotificationChannel('smartspot_alarm_channel_v5');
+          await androidPlugin?.deleteNotificationChannel('smartspot_live_guidance_v5');
+          await androidPlugin?.deleteNotificationChannel('smartspot_task_status_v5');
+          await androidPlugin?.deleteNotificationChannel('smartspot_summary_v5');
         } catch (_) {}
 
         const customSound =
@@ -960,12 +963,6 @@ class NotificationService {
     bool withVibration = true,
   }) async {
     if (!_initialized) await init();
-
-    if (withVibration) {
-      try {
-        HapticFeedback.lightImpact();
-      } catch (_) {}
-    }
 
     final total = activeCount + completedCount;
     final title = '📊 SmartSpot Overview • $activeCount Active Reminder${activeCount != 1 ? 's' : ''}';

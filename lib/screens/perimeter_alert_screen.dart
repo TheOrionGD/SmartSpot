@@ -2,14 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:vibration/vibration.dart';
 import '../models/reminder.dart';
 import '../providers/live_location_provider.dart';
 import '../providers/reminder_provider.dart';
 import '../screens/live_map_screen.dart';
+import '../services/alarm_audio_service.dart';
 import '../utils/app_theme.dart';
 import '../utils/app_motion.dart';
-import '../utils/web_audio/web_audio.dart';
 
 enum AlertPerimeterType {
   inside,
@@ -18,9 +17,10 @@ enum AlertPerimeterType {
   timeDue,
 }
 
-/// A dedicated full-screen dynamic perimeter vibration & alert screen.
-/// Features synchronized radar wave animations, live distance tracking,
-/// haptic feedback pulsing, and hardware power button / tap-to-silence controls.
+/// A dedicated full-screen dynamic perimeter alarm & alert screen.
+/// Runs concurrent real hardware vibration and MP3 tune playback (vibration_sound.mp3),
+/// featuring synchronized radar wave animations, live distance tracking,
+/// and tap-to-silence controls.
 class PerimeterAlertScreen extends StatefulWidget {
   final Reminder reminder;
   final AlertPerimeterType alertType;
@@ -58,7 +58,6 @@ class PerimeterAlertScreen extends StatefulWidget {
 class _PerimeterAlertScreenState extends State<PerimeterAlertScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _pulseController;
-  Timer? _vibrationTimer;
   Timer? _clockTimer;
   DateTime _currentDateTime = DateTime.now();
   bool _isSilenced = false;
@@ -112,8 +111,12 @@ class _PerimeterAlertScreenState extends State<PerimeterAlertScreen>
       duration: const Duration(milliseconds: 1600),
     )..repeat();
 
-    _startVibrationPulseLoop();
-    WebAudioHelper.play();
+    // Start concurrent real hardware vibration and MP3 tune playback
+    AlarmAudioService.instance.startAlarm(
+      loop: true,
+      enableVibration: true,
+      enableSound: true,
+    );
 
     if (widget.alertType == AlertPerimeterType.timeDue) {
       _clockTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -126,50 +129,17 @@ class _PerimeterAlertScreenState extends State<PerimeterAlertScreen>
     }
   }
 
-  void _startVibrationPulseLoop() async {
-    try {
-      final hasVibrator = await Vibration.hasVibrator();
-      if (hasVibrator) {
-        if (widget.alertType == AlertPerimeterType.outside) {
-          Vibration.vibrate(
-            pattern: [0, 800, 400, 800],
-            repeat: 0,
-          );
-        } else if (widget.alertType == AlertPerimeterType.inside) {
-          Vibration.vibrate(
-            pattern: [0, 1000],
-            repeat: 0,
-          );
-        } else if (widget.alertType == AlertPerimeterType.timeDue) {
-          Vibration.vibrate(
-            pattern: [0, 500, 200, 500, 200, 500, 800],
-            repeat: 0,
-          );
-        } else {
-          Vibration.vibrate(
-            pattern: [0, 500, 500, 500],
-            repeat: 0,
-          );
-        }
-      }
-    } catch (_) {}
-  }
-
   void _silenceAlert() {
     if (_isSilenced) return;
     setState(() {
       _isSilenced = true;
     });
-    try {
-      Vibration.cancel().catchError((_) {});
-    } catch (_) {}
-    WebAudioHelper.stop();
+    AlarmAudioService.instance.stop();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // When user presses power button, phone screen turns off (paused),
-    // automatically silences the ongoing vibration.
+    // When user presses power button or leaves screen, automatically silence
     if (state == AppLifecycleState.paused) {
       _silenceAlert();
     }
@@ -178,10 +148,9 @@ class _PerimeterAlertScreenState extends State<PerimeterAlertScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _vibrationTimer?.cancel();
     _clockTimer?.cancel();
     _pulseController.dispose();
-    WebAudioHelper.stop();
+    AlarmAudioService.instance.stop();
     super.dispose();
   }
 

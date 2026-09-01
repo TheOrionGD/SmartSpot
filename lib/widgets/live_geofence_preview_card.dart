@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:provider/provider.dart';
@@ -109,11 +108,6 @@ class LiveGeofencePreviewCard extends StatelessWidget {
     final statusColor = _getStatusColor(geofenceState);
     final formattedDistance = locationProvider.formatDistance(distanceMeters);
     final formattedEdgeDistance = locationProvider.formatDistance(edgeDistanceMeters);
-
-    // Provide haptic feedback when user is outside the perimeter
-    if (geofenceState == GeofenceState.outside && locationProvider.hasPermission) {
-      HapticFeedback.selectionClick();
-    }
 
     return Container(
       decoration: BoxDecoration(
