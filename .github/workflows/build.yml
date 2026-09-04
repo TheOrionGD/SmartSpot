@@ -1,0 +1,46 @@
+name: Build and Sign Production Flutter Bundle
+
+on:
+  push:
+    branches: [ theoriongd ] # Triggers a build when you push to your current branch
+  workflow_dispatch:         # Allows you to click a button to run a build manually
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java Development Kit
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install Project Dependencies
+        run: flutter pub get
+
+      - name: Build Unsigned Android App Bundle
+        run: flutter build appbundle --release
+
+      - name: Sign App Bundle with Production Key
+        id: sign_app
+        uses: r0adkll/sign-android-release@v1
+        with:
+          releaseDirectory: build/app/outputs/bundle/release
+          signingKeyBase64: ${{ secrets.ANDROID_SIGNING_KEY }}
+          alias: ${{ secrets.ANDROID_ALIAS }}
+          keyStorePassword: ${{ secrets.ANDROID_KEY_STORE_PASSWORD }}
+          keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Upload Production Signed Bundle to GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: Signed-Release-Bundle
+          path: ${{ steps.sign_app.outputs.signedReleaseFile }}
